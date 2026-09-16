@@ -1,4 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   Box,
@@ -13,6 +17,7 @@ import {
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 
 import { motion } from "motion/react";
 import { useNavigate } from "react-router-dom";
@@ -24,41 +29,162 @@ import { drawerWidth } from "../components/Sidebar";
 
 import projects from "../data/projects";
 
+const STORAGE_KEY = "akash_developer_projects";
+
 const categories = [
   "All",
   "Frontend",
+  "Backend",
   "Full-Stack",
   "AI / Automation",
+  "RAG",
+  "Other",
 ];
+
+function getStoredProjects() {
+  try {
+    const storedProjects = localStorage.getItem(
+      STORAGE_KEY
+    );
+
+    if (!storedProjects) {
+      return [];
+    }
+
+    const parsedProjects =
+      JSON.parse(storedProjects);
+
+    return Array.isArray(parsedProjects)
+      ? parsedProjects
+      : [];
+  } catch (error) {
+    console.error(
+      "Unable to read saved projects:",
+      error
+    );
+
+    return [];
+  }
+}
+
+function getAllProjects() {
+  const storedProjects = getStoredProjects();
+
+  return [
+    ...storedProjects,
+    ...projects,
+  ];
+}
 
 export default function Projects() {
   const navigate = useNavigate();
 
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [mobileOpen, setMobileOpen] =
+    useState(false);
+
+  const [search, setSearch] =
+    useState("");
+
   const [selectedCategory, setSelectedCategory] =
     useState("All");
 
+  const [allProjects, setAllProjects] =
+    useState(() => getAllProjects());
+
+  /*
+   * Refresh projects whenever localStorage
+   * changes from another browser tab/window.
+   */
+  useEffect(() => {
+    const handleStorageChange = (event) => {
+      if (event.key === STORAGE_KEY) {
+        setAllProjects(getAllProjects());
+      }
+    };
+
+    window.addEventListener(
+      "storage",
+      handleStorageChange
+    );
+
+    return () => {
+      window.removeEventListener(
+        "storage",
+        handleStorageChange
+      );
+    };
+  }, []);
+
+  /*
+   * Refresh when this page becomes visible again.
+   * This helps when returning from Add Project.
+   */
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "visible"
+      ) {
+        setAllProjects(getAllProjects());
+      }
+    };
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
+  }, []);
+
   const filteredProjects = useMemo(() => {
-    return projects.filter((project) => {
-      const searchValue = search.toLowerCase().trim();
+    const searchValue =
+      search.toLowerCase().trim();
+
+    return allProjects.filter((project) => {
+      const projectName = (
+        project.name || ""
+      ).toLowerCase();
+
+      const projectDescription = (
+        project.description || ""
+      ).toLowerCase();
+
+      const projectTechnologies =
+        Array.isArray(project.technologies)
+          ? project.technologies
+          : [];
 
       const matchesSearch =
-        project.name.toLowerCase().includes(searchValue) ||
-        project.description
-          .toLowerCase()
-          .includes(searchValue) ||
-        project.technologies.some((technology) =>
-          technology.toLowerCase().includes(searchValue)
+        projectName.includes(searchValue) ||
+        projectDescription.includes(
+          searchValue
+        ) ||
+        projectTechnologies.some(
+          (technology) =>
+            technology
+              .toLowerCase()
+              .includes(searchValue)
         );
 
       const matchesCategory =
         selectedCategory === "All" ||
         project.category === selectedCategory;
 
-      return matchesSearch && matchesCategory;
+      return (
+        matchesSearch &&
+        matchesCategory
+      );
     });
-  }, [search, selectedCategory]);
+  }, [
+    allProjects,
+    search,
+    selectedCategory,
+  ]);
 
   return (
     <Box
@@ -85,7 +211,9 @@ export default function Projects() {
         <Topbar
           title="Projects"
           subtitle="Explore everything you've built"
-          onMenuClick={() => setMobileOpen(true)}
+          onMenuClick={() =>
+            setMobileOpen(true)
+          }
         />
 
         <Container
@@ -127,7 +255,8 @@ export default function Projects() {
                   xs: "flex-start",
                   md: "center",
                 },
-                justifyContent: "space-between",
+                justifyContent:
+                  "space-between",
                 flexDirection: {
                   xs: "column",
                   md: "row",
@@ -156,41 +285,106 @@ export default function Projects() {
                     color: "#777f8d",
                   }}
                 >
-                  A collection of projects, experiments and
-                  applications I've built.
+                  A collection of projects,
+                  experiments and applications
+                  I've built.
                 </Typography>
               </Box>
 
+              {/* Header Actions */}
               <Box
                 sx={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 1,
-                  px: 1.5,
-                  py: 1,
-                  borderRadius: 2.5,
-                  backgroundColor:
-                    "rgba(155,124,255,0.08)",
-                  border:
-                    "1px solid rgba(155,124,255,0.14)",
+                  gap: 1.2,
+                  flexWrap: "wrap",
                 }}
               >
-                <FolderRoundedIcon
-                  sx={{
-                    fontSize: 19,
-                    color: "#9b7cff",
+                {/* Add Project */}
+                <motion.div
+                  whileHover={{
+                    scale: 1.03,
                   }}
-                />
-
-                <Typography
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "#b6adff",
+                  whileTap={{
+                    scale: 0.97,
                   }}
                 >
-                  {projects.length} Projects
-                </Typography>
+                  <Button
+                    onClick={() =>
+                      navigate(
+                        "/projects/add"
+                      )
+                    }
+                    startIcon={
+                      <AddRoundedIcon
+                        sx={{
+                          fontSize: 19,
+                        }}
+                      />
+                    }
+                    sx={{
+                      minHeight: 42,
+                      px: 2,
+                      borderRadius: 2.5,
+                      textTransform: "none",
+                      color: "#ffffff",
+                      background:
+                        "linear-gradient(135deg, #7c5cff, #9b7cff)",
+                      border:
+                        "1px solid rgba(167,139,250,0.35)",
+                      boxShadow:
+                        "0 8px 25px rgba(124,92,255,0.18)",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      transition:
+                        "all 0.25s ease",
+                      "&:hover": {
+                        background:
+                          "linear-gradient(135deg, #8a6cff, #a78bfa)",
+                        boxShadow:
+                          "0 12px 32px rgba(124,92,255,0.3)",
+                        transform:
+                          "translateY(-1px)",
+                      },
+                    }}
+                  >
+                    Add Project
+                  </Button>
+                </motion.div>
+
+                {/* Project Count */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    px: 1.5,
+                    py: 1,
+                    minHeight: 42,
+                    borderRadius: 2.5,
+                    backgroundColor:
+                      "rgba(155,124,255,0.08)",
+                    border:
+                      "1px solid rgba(155,124,255,0.14)",
+                  }}
+                >
+                  <FolderRoundedIcon
+                    sx={{
+                      fontSize: 19,
+                      color: "#9b7cff",
+                    }}
+                  />
+
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#b6adff",
+                    }}
+                  >
+                    {allProjects.length} Projects
+                  </Typography>
+                </Box>
               </Box>
             </Box>
           </motion.div>
@@ -219,7 +413,8 @@ export default function Projects() {
                   "rgba(255,255,255,0.035)",
                 border:
                   "1px solid rgba(255,255,255,0.06)",
-                transition: "all 0.25s ease",
+                transition:
+                  "all 0.25s ease",
                 "&:focus-within": {
                   borderColor:
                     "rgba(155,124,255,0.5)",
@@ -239,7 +434,9 @@ export default function Projects() {
               <InputBase
                 value={search}
                 onChange={(event) =>
-                  setSearch(event.target.value)
+                  setSearch(
+                    event.target.value
+                  )
                 }
                 placeholder="Search by project, technology..."
                 fullWidth
@@ -268,47 +465,57 @@ export default function Projects() {
                 },
               }}
             >
-              {categories.map((category) => {
-                const active =
-                  selectedCategory === category;
+              {categories.map(
+                (category) => {
+                  const active =
+                    selectedCategory ===
+                    category;
 
-                return (
-                  <Button
-                    key={category}
-                    onClick={() =>
-                      setSelectedCategory(category)
-                    }
-                    sx={{
-                      flexShrink: 0,
-                      minWidth: "auto",
-                      px: 2,
-                      py: 0.8,
-                      borderRadius: 2,
-                      textTransform: "none",
-                      fontSize: 11.5,
-                      fontWeight: active ? 700 : 500,
-                      color: active
-                        ? "#ffffff"
-                        : "#7d8492",
-                      backgroundColor: active
-                        ? "rgba(124,92,255,0.18)"
-                        : "transparent",
-                      border: active
-                        ? "1px solid rgba(155,124,255,0.28)"
-                        : "1px solid transparent",
-                      transition:
-                        "all 0.2s ease",
-                      "&:hover": {
+                  return (
+                    <Button
+                      key={category}
+                      onClick={() =>
+                        setSelectedCategory(
+                          category
+                        )
+                      }
+                      sx={{
+                        flexShrink: 0,
+                        minWidth: "auto",
+                        px: 2,
+                        py: 0.8,
+                        borderRadius: 2,
+                        textTransform:
+                          "none",
+                        fontSize: 11.5,
+                        fontWeight: active
+                          ? 700
+                          : 500,
+                        color: active
+                          ? "#ffffff"
+                          : "#7d8492",
                         backgroundColor:
-                          "rgba(124,92,255,0.12)",
-                        color: "#ffffff",
-                      },
-                    }}
-                  >
-                    {category}
-                  </Button>
-                );
-              })}
+                          active
+                            ? "rgba(124,92,255,0.18)"
+                            : "transparent",
+                        border: active
+                          ? "1px solid rgba(155,124,255,0.28)"
+                          : "1px solid transparent",
+                        transition:
+                          "all 0.2s ease",
+                        "&:hover": {
+                          backgroundColor:
+                            "rgba(124,92,255,0.12)",
+                          color:
+                            "#ffffff",
+                        },
+                      }}
+                    >
+                      {category}
+                    </Button>
+                  );
+                }
+              )}
             </Box>
           </Box>
 
@@ -317,8 +524,17 @@ export default function Projects() {
             sx={{
               mb: 2.5,
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
+              alignItems: {
+                xs: "flex-start",
+                sm: "center",
+              },
+              justifyContent:
+                "space-between",
+              flexDirection: {
+                xs: "column",
+                sm: "row",
+              },
+              gap: 1,
             }}
           >
             <Typography
@@ -359,405 +575,540 @@ export default function Projects() {
               spacing={2.5}
             >
               {filteredProjects.map(
-                (project, index) => (
-                  <Grid
-                    key={project.id}
-                    size={{
-                      xs: 12,
-                      sm: 6,
-                      xl: 4,
-                    }}
-                  >
-                    <motion.div
-                      initial={{
-                        opacity: 0,
-                        y: 25,
-                      }}
-                      animate={{
-                        opacity: 1,
-                        y: 0,
-                      }}
-                      transition={{
-                        duration: 0.45,
-                        delay: index * 0.08,
-                      }}
-                      whileHover={{
-                        y: -6,
-                      }}
-                      style={{
-                        height: "100%",
+                (project, index) => {
+                  const hasScreenshot =
+                    Array.isArray(
+                      project.screenshots
+                    ) &&
+                    project.screenshots.length >
+                      0;
+
+                  const technologies =
+                    Array.isArray(
+                      project.technologies
+                    )
+                      ? project.technologies
+                      : [];
+
+                  return (
+                    <Grid
+                      key={project.id}
+                      size={{
+                        xs: 12,
+                        sm: 6,
+                        xl: 4,
                       }}
                     >
-                      <Box
-                        sx={{
+                      <motion.div
+                        initial={{
+                          opacity: 0,
+                          y: 25,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        transition={{
+                          duration: 0.45,
+                          delay:
+                            index * 0.08,
+                        }}
+                        whileHover={{
+                          y: -6,
+                        }}
+                        style={{
                           height: "100%",
-                          overflow: "hidden",
-                          borderRadius: 4,
-                          background:
-                            "linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025))",
-                          border:
-                            "1px solid rgba(255,255,255,0.07)",
-                          transition:
-                            "all 0.3s ease",
-                          "&:hover": {
-                            borderColor:
-                              "rgba(155,124,255,0.35)",
-                            boxShadow:
-                              "0 20px 50px rgba(0,0,0,0.25)",
-                          },
                         }}
                       >
-                        {/* Screenshot / Preview */}
                         <Box
                           sx={{
-                            height: {
-                              xs: 190,
-                              md: 210,
-                            },
-                            position: "relative",
+                            height: "100%",
                             overflow: "hidden",
+                            borderRadius: 4,
                             background:
-                              project.gradient,
+                              "linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025))",
+                            border:
+                              "1px solid rgba(255,255,255,0.07)",
+                            transition:
+                              "all 0.3s ease",
+                            "&:hover": {
+                              borderColor:
+                                "rgba(155,124,255,0.35)",
+                              boxShadow:
+                                "0 20px 50px rgba(0,0,0,0.25)",
+                            },
                           }}
                         >
-                          {/* Preview Grid */}
+                          {/* Project Preview */}
                           <Box
                             sx={{
-                              position: "absolute",
-                              inset: 0,
-                              opacity: 0.12,
-                              backgroundImage:
-                                "linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px)",
-                              backgroundSize:
-                                "35px 35px",
-                            }}
-                          />
-
-                          {/* Preview Text */}
-                          <Box
-                            sx={{
+                              height: {
+                                xs: 190,
+                                md: 210,
+                              },
                               position:
-                                "absolute",
-                              inset: 0,
-                              display: "flex",
-                              alignItems:
-                                "center",
-                              justifyContent:
-                                "center",
-                            }}
-                          >
-                            <Typography
-                              sx={{
-                                px: 3,
-                                textAlign:
-                                  "center",
-                                fontSize: 24,
-                                fontWeight: 800,
-                                color:
-                                  "rgba(255,255,255,0.85)",
-                                letterSpacing:
-                                  "-0.6px",
-                              }}
-                            >
-                              {project.name}
-                            </Typography>
-                          </Box>
-
-                          {/* Overlay */}
-                          <Box
-                            sx={{
-                              position:
-                                "absolute",
-                              inset: 0,
+                                "relative",
+                              overflow:
+                                "hidden",
                               background:
-                                "linear-gradient(to bottom, transparent 35%, rgba(7,9,13,0.78) 100%)",
-                            }}
-                          />
-
-                          {/* Category */}
-                          <Box
-                            sx={{
-                              position:
-                                "absolute",
-                              top: 15,
-                              left: 15,
+                                project.gradient ||
+                                "linear-gradient(135deg, #5429a8 0%, #17112e 100%)",
                             }}
                           >
-                            <Chip
-                              label={
-                                project.category
-                              }
-                              size="small"
+                            {/* Actual Screenshot */}
+                            {hasScreenshot && (
+                              <Box
+                                component="img"
+                                src={
+                                  project
+                                    .screenshots[0]
+                                }
+                                alt={`${project.name} screenshot`}
+                                sx={{
+                                  position:
+                                    "absolute",
+                                  inset: 0,
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit:
+                                    "cover",
+                                  display:
+                                    "block",
+                                  transition:
+                                    "transform 0.5s ease",
+                                  "&:hover": {
+                                    transform:
+                                      "scale(1.04)",
+                                  },
+                                }}
+                              />
+                            )}
+
+                            {/* Gradient Preview */}
+                            {!hasScreenshot && (
+                              <>
+                                <Box
+                                  sx={{
+                                    position:
+                                      "absolute",
+                                    inset: 0,
+                                    opacity: 0.12,
+                                    backgroundImage:
+                                      "linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px)",
+                                    backgroundSize:
+                                      "35px 35px",
+                                  }}
+                                />
+
+                                <Box
+                                  sx={{
+                                    position:
+                                      "absolute",
+                                    inset: 0,
+                                    display:
+                                      "flex",
+                                    alignItems:
+                                      "center",
+                                    justifyContent:
+                                      "center",
+                                  }}
+                                >
+                                  <Typography
+                                    sx={{
+                                      px: 3,
+                                      textAlign:
+                                        "center",
+                                      fontSize: 24,
+                                      fontWeight: 800,
+                                      color:
+                                        "rgba(255,255,255,0.85)",
+                                      letterSpacing:
+                                        "-0.6px",
+                                    }}
+                                  >
+                                    {
+                                      project.name
+                                    }
+                                  </Typography>
+                                </Box>
+                              </>
+                            )}
+
+                            {/* Preview Overlay */}
+                            <Box
                               sx={{
-                                height: 28,
-                                color: "#ffffff",
-                                backgroundColor:
-                                  "rgba(0,0,0,0.35)",
-                                backdropFilter:
-                                  "blur(8px)",
-                                border:
-                                  "1px solid rgba(255,255,255,0.12)",
-                                fontSize: 10.5,
-                                fontWeight: 600,
+                                position:
+                                  "absolute",
+                                inset: 0,
+                                background:
+                                  "linear-gradient(to bottom, rgba(7,9,13,0.05) 25%, rgba(7,9,13,0.85) 100%)",
                               }}
                             />
-                          </Box>
 
-                          {/* Status */}
-                          <Box
-                            sx={{
-                              position:
-                                "absolute",
-                              left: 17,
-                              right: 17,
-                              bottom: 15,
-                              display: "flex",
-                              alignItems:
-                                "center",
-                              justifyContent:
-                                "space-between",
-                            }}
-                          >
-                            <Typography
-                              sx={{
-                                fontSize: 11,
-                                color:
-                                  "#ffffff",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {project.status}
-                            </Typography>
-
-                            <Typography
-                              sx={{
-                                fontSize: 11,
-                                color:
-                                  "rgba(255,255,255,0.7)",
-                              }}
-                            >
-                              {project.year}
-                            </Typography>
-                          </Box>
-                        </Box>
-
-                        {/* Card Content */}
-                        <Box
-                          sx={{
-                            p: 2.5,
-                          }}
-                        >
-                          <Typography
-                            sx={{
-                              fontSize: 18,
-                              fontWeight: 750,
-                              color: "#ffffff",
-                              letterSpacing:
-                                "-0.4px",
-                            }}
-                          >
-                            {project.name}
-                          </Typography>
-
-                          <Typography
-                            sx={{
-                              mt: 1,
-                              fontSize: 12.5,
-                              lineHeight: 1.7,
-                              color: "#7d8492",
-                              display:
-                                "-webkit-box",
-                              WebkitLineClamp: 3,
-                              WebkitBoxOrient:
-                                "vertical",
-                              overflow: "hidden",
-                              minHeight: 64,
-                            }}
-                          >
-                            {
-                              project.description
-                            }
-                          </Typography>
-
-                          {/* Technologies */}
-                          <Box
-                            sx={{
-                              mt: 2,
-                              display: "flex",
-                              flexWrap:
-                                "wrap",
-                              gap: 0.8,
-                            }}
-                          >
-                            {project.technologies
-                              .slice(0, 4)
-                              .map(
-                                (technology) => (
-                                  <Chip
-                                    key={
-                                      technology
-                                    }
-                                    label={
-                                      technology
-                                    }
-                                    size="small"
-                                    sx={{
-                                      height: 26,
-                                      color:
-                                        "#aeb4c0",
-                                      backgroundColor:
-                                        "rgba(255,255,255,0.04)",
-                                      border:
-                                        "1px solid rgba(255,255,255,0.06)",
-                                      fontSize: 10.5,
-                                      transition:
-                                        "all 0.2s ease",
-                                      "&:hover":
-                                        {
-                                          backgroundColor:
-                                            "rgba(155,124,255,0.1)",
-                                          color:
-                                            "#ffffff",
-                                          borderColor:
-                                            "rgba(155,124,255,0.2)",
-                                        },
-                                    }}
-                                  />
-                                )
-                              )}
-                          </Box>
-
-                          {/* Progress */}
-                          <Box
-                            sx={{
-                              mt: 2.5,
-                            }}
-                          >
+                            {/* Category */}
                             <Box
                               sx={{
+                                position:
+                                  "absolute",
+                                top: 15,
+                                left: 15,
+                              }}
+                            >
+                              <Chip
+                                label={
+                                  project.category
+                                }
+                                size="small"
+                                sx={{
+                                  height: 28,
+                                  color:
+                                    "#ffffff",
+                                  backgroundColor:
+                                    "rgba(0,0,0,0.48)",
+                                  backdropFilter:
+                                    "blur(8px)",
+                                  border:
+                                    "1px solid rgba(255,255,255,0.12)",
+                                  fontSize:
+                                    10.5,
+                                  fontWeight:
+                                    600,
+                                }}
+                              />
+                            </Box>
+
+                            {/* Screenshot Count */}
+                            {hasScreenshot && (
+                              <Box
+                                sx={{
+                                  position:
+                                    "absolute",
+                                  top: 15,
+                                  right: 15,
+                                  px: 1,
+                                  py: 0.6,
+                                  borderRadius:
+                                    1.5,
+                                  backgroundColor:
+                                    "rgba(0,0,0,0.48)",
+                                  backdropFilter:
+                                    "blur(8px)",
+                                  border:
+                                    "1px solid rgba(255,255,255,0.12)",
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize:
+                                      10,
+                                    color:
+                                      "#ffffff",
+                                    fontWeight:
+                                      700,
+                                  }}
+                                >
+                                  {project
+                                    .screenshots
+                                    .length}{" "}
+                                  screenshot
+                                  {project
+                                    .screenshots
+                                    .length >
+                                  1
+                                    ? "s"
+                                    : ""}
+                                </Typography>
+                              </Box>
+                            )}
+
+                            {/* Status + Year */}
+                            <Box
+                              sx={{
+                                position:
+                                  "absolute",
+                                left: 17,
+                                right: 17,
+                                bottom: 15,
                                 display:
                                   "flex",
+                                alignItems:
+                                  "center",
                                 justifyContent:
                                   "space-between",
-                                mb: 0.8,
                               }}
                             >
                               <Typography
                                 sx={{
-                                  fontSize: 10.5,
+                                  fontSize:
+                                    11,
                                   color:
-                                    "#656d7b",
-                                }}
-                              >
-                                Progress
-                              </Typography>
-
-                              <Typography
-                                sx={{
-                                  fontSize: 10.5,
-                                  color:
-                                    "#9b7cff",
-                                  fontWeight: 700,
+                                    "#ffffff",
+                                  fontWeight:
+                                    600,
                                 }}
                               >
                                 {
-                                  project.progress
+                                  project.status
                                 }
-                                %
                               </Typography>
-                            </Box>
 
-                            <Box
-                              sx={{
-                                height: 4,
-                                borderRadius: 10,
-                                backgroundColor:
-                                  "rgba(255,255,255,0.06)",
-                                overflow:
-                                  "hidden",
-                              }}
-                            >
-                              <motion.div
-                                initial={{
-                                  width: 0,
+                              <Typography
+                                sx={{
+                                  fontSize:
+                                    11,
+                                  color:
+                                    "rgba(255,255,255,0.7)",
                                 }}
-                                animate={{
-                                  width: `${project.progress}%`,
-                                }}
-                                transition={{
-                                  duration: 0.8,
-                                  delay:
-                                    0.2 +
-                                    index *
-                                      0.08,
-                                }}
-                                style={{
-                                  height:
-                                    "100%",
-                                  borderRadius:
-                                    10,
-                                  background:
-                                    "linear-gradient(90deg, #7c5cff, #a78bfa)",
-                                }}
-                              />
+                              >
+                                {
+                                  project.year
+                                }
+                              </Typography>
                             </Box>
                           </Box>
 
-                          {/* Button */}
-                          <Button
-                            fullWidth
-                            endIcon={
-                              <ArrowForwardRoundedIcon
-                                sx={{
-                                  fontSize: 16,
-                                }}
-                              />
-                            }
-                            onClick={() =>
-                              navigate(
-                                `/projects/${project.id}`
-                              )
-                            }
+                          {/* Card Content */}
+                          <Box
                             sx={{
-                              mt: 2.5,
-                              py: 1.1,
-                              borderRadius: 2.5,
-                              textTransform:
-                                "none",
-                              color: "#ffffff",
-                              backgroundColor:
-                                "rgba(124,92,255,0.1)",
-                              border:
-                                "1px solid rgba(124,92,255,0.16)",
-                              fontSize: 12,
-                              fontWeight: 700,
-                              transition:
-                                "all 0.25s ease",
-                              "&:hover": {
-                                backgroundColor:
-                                  "rgba(124,92,255,0.2)",
-                                borderColor:
-                                  "rgba(155,124,255,0.35)",
-                                "& .MuiButton-endIcon":
-                                  {
-                                    transform:
-                                      "translateX(4px)",
-                                  },
-                              },
-                              "& .MuiButton-endIcon":
-                                {
-                                  transition:
-                                    "transform 0.2s ease",
-                                },
+                              p: 2.5,
                             }}
                           >
-                            View Project
-                          </Button>
+                            <Typography
+                              sx={{
+                                fontSize: 18,
+                                fontWeight: 750,
+                                color:
+                                  "#ffffff",
+                                letterSpacing:
+                                  "-0.4px",
+                              }}
+                            >
+                              {
+                                project.name
+                              }
+                            </Typography>
+
+                            <Typography
+                              sx={{
+                                mt: 1,
+                                fontSize:
+                                  12.5,
+                                lineHeight:
+                                  1.7,
+                                color:
+                                  "#7d8492",
+                                display:
+                                  "-webkit-box",
+                                WebkitLineClamp:
+                                  3,
+                                WebkitBoxOrient:
+                                  "vertical",
+                                overflow:
+                                  "hidden",
+                                minHeight: 64,
+                              }}
+                            >
+                              {
+                                project.description
+                              }
+                            </Typography>
+
+                            {/* Technologies */}
+                            <Box
+                              sx={{
+                                mt: 2,
+                                display:
+                                  "flex",
+                                flexWrap:
+                                  "wrap",
+                                gap: 0.8,
+                              }}
+                            >
+                              {technologies
+                                .slice(
+                                  0,
+                                  4
+                                )
+                                .map(
+                                  (
+                                    technology
+                                  ) => (
+                                    <Chip
+                                      key={
+                                        technology
+                                      }
+                                      label={
+                                        technology
+                                      }
+                                      size="small"
+                                      sx={{
+                                        height: 26,
+                                        color:
+                                          "#aeb4c0",
+                                        backgroundColor:
+                                          "rgba(255,255,255,0.04)",
+                                        border:
+                                          "1px solid rgba(255,255,255,0.06)",
+                                        fontSize:
+                                          10.5,
+                                        transition:
+                                          "all 0.2s ease",
+                                        "&:hover":
+                                          {
+                                            backgroundColor:
+                                              "rgba(155,124,255,0.1)",
+                                            color:
+                                              "#ffffff",
+                                            borderColor:
+                                              "rgba(155,124,255,0.2)",
+                                          },
+                                      }}
+                                    />
+                                  )
+                                )}
+                            </Box>
+
+                            {/* Progress */}
+                            <Box
+                              sx={{
+                                mt: 2.5,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display:
+                                    "flex",
+                                  justifyContent:
+                                    "space-between",
+                                  mb: 0.8,
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize:
+                                      10.5,
+                                    color:
+                                      "#656d7b",
+                                  }}
+                                >
+                                  Progress
+                                </Typography>
+
+                                <Typography
+                                  sx={{
+                                    fontSize:
+                                      10.5,
+                                    color:
+                                      "#9b7cff",
+                                    fontWeight:
+                                      700,
+                                  }}
+                                >
+                                  {
+                                    project.progress
+                                  }
+                                  %
+                                </Typography>
+                              </Box>
+
+                              <Box
+                                sx={{
+                                  height: 4,
+                                  borderRadius:
+                                    10,
+                                  backgroundColor:
+                                    "rgba(255,255,255,0.06)",
+                                  overflow:
+                                    "hidden",
+                                }}
+                              >
+                                <motion.div
+                                  initial={{
+                                    width: 0,
+                                  }}
+                                  animate={{
+                                    width: `${project.progress}%`,
+                                  }}
+                                  transition={{
+                                    duration: 0.8,
+                                    delay:
+                                      0.2 +
+                                      index *
+                                        0.08,
+                                  }}
+                                  style={{
+                                    height:
+                                      "100%",
+                                    borderRadius:
+                                      10,
+                                    background:
+                                      "linear-gradient(90deg, #7c5cff, #a78bfa)",
+                                  }}
+                                />
+                              </Box>
+                            </Box>
+
+                            {/* View Project */}
+                            <Button
+                              fullWidth
+                              endIcon={
+                                <ArrowForwardRoundedIcon
+                                  sx={{
+                                    fontSize: 16,
+                                  }}
+                                />
+                              }
+                              onClick={() =>
+                                navigate(
+                                  `/projects/${project.id}`
+                                )
+                              }
+                              sx={{
+                                mt: 2.5,
+                                py: 1.1,
+                                borderRadius:
+                                  2.5,
+                                textTransform:
+                                  "none",
+                                color:
+                                  "#ffffff",
+                                backgroundColor:
+                                  "rgba(124,92,255,0.1)",
+                                border:
+                                  "1px solid rgba(124,92,255,0.16)",
+                                fontSize:
+                                  12,
+                                fontWeight:
+                                  700,
+                                transition:
+                                  "all 0.25s ease",
+                                "&:hover":
+                                  {
+                                    backgroundColor:
+                                      "rgba(124,92,255,0.2)",
+                                    borderColor:
+                                      "rgba(155,124,255,0.35)",
+                                    "& .MuiButton-endIcon":
+                                      {
+                                        transform:
+                                          "translateX(4px)",
+                                      },
+                                  },
+                                "& .MuiButton-endIcon":
+                                  {
+                                    transition:
+                                      "transform 0.2s ease",
+                                  },
+                              }}
+                            >
+                              View Project
+                            </Button>
+                          </Box>
                         </Box>
-                      </Box>
-                    </motion.div>
-                  </Grid>
-                )
+                      </motion.div>
+                    </Grid>
+                  );
+                }
               )}
             </Grid>
           ) : (
@@ -798,14 +1149,16 @@ export default function Projects() {
                   color: "#686f7c",
                 }}
               >
-                Try a different search term or
-                category.
+                Try a different search term
+                or category.
               </Typography>
 
               <Button
                 onClick={() => {
                   setSearch("");
-                  setSelectedCategory("All");
+                  setSelectedCategory(
+                    "All"
+                  );
                 }}
                 sx={{
                   mt: 2,
@@ -816,6 +1169,36 @@ export default function Projects() {
                 }}
               >
                 Clear filters
+              </Button>
+
+              <Button
+                onClick={() =>
+                  navigate(
+                    "/projects/add"
+                  )
+                }
+                startIcon={
+                  <AddRoundedIcon />
+                }
+                sx={{
+                  mt: 1,
+                  ml: 1,
+                  textTransform: "none",
+                  color: "#ffffff",
+                  backgroundColor:
+                    "rgba(124,92,255,0.12)",
+                  border:
+                    "1px solid rgba(124,92,255,0.2)",
+                  borderRadius: 2,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  "&:hover": {
+                    backgroundColor:
+                      "rgba(124,92,255,0.2)",
+                  },
+                }}
+              >
+                Add Project
               </Button>
             </Box>
           )}
