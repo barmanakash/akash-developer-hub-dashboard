@@ -20,6 +20,7 @@ import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 
 import { motion } from "motion/react";
+
 import { useNavigate } from "react-router-dom";
 
 import Sidebar from "../components/Sidebar";
@@ -29,7 +30,11 @@ import { drawerWidth } from "../components/Sidebar";
 
 import projects from "../data/projects";
 
-const STORAGE_KEY = "akash_developer_projects";
+const STORAGE_KEY =
+  "akash_developer_projects";
+
+const DELETED_KEY =
+  "akash_deleted_projects";
 
 const categories = [
   "All",
@@ -43,9 +48,10 @@ const categories = [
 
 function getStoredProjects() {
   try {
-    const storedProjects = localStorage.getItem(
-      STORAGE_KEY
-    );
+    const storedProjects =
+      localStorage.getItem(
+        STORAGE_KEY
+      );
 
     if (!storedProjects) {
       return [];
@@ -54,7 +60,9 @@ function getStoredProjects() {
     const parsedProjects =
       JSON.parse(storedProjects);
 
-    return Array.isArray(parsedProjects)
+    return Array.isArray(
+      parsedProjects
+    )
       ? parsedProjects
       : [];
   } catch (error) {
@@ -67,12 +75,73 @@ function getStoredProjects() {
   }
 }
 
+function getDeletedProjectIds() {
+  try {
+    const deletedProjects =
+      localStorage.getItem(
+        DELETED_KEY
+      );
+
+    if (!deletedProjects) {
+      return [];
+    }
+
+    const parsedProjects =
+      JSON.parse(
+        deletedProjects
+      );
+
+    return Array.isArray(
+      parsedProjects
+    )
+      ? parsedProjects.map(
+          (id) => String(id)
+        )
+      : [];
+  } catch (error) {
+    console.error(
+      "Unable to read deleted projects:",
+      error
+    );
+
+    return [];
+  }
+}
+
 function getAllProjects() {
-  const storedProjects = getStoredProjects();
+  const storedProjects =
+    getStoredProjects();
+
+  const deletedIds =
+    new Set(
+      getDeletedProjectIds()
+    );
+
+  const storedIds =
+    new Set(
+      storedProjects.map(
+        (project) =>
+          String(project.id)
+      )
+    );
 
   return [
-    ...storedProjects,
-    ...projects,
+    ...storedProjects.filter(
+      (project) =>
+        !deletedIds.has(
+          String(project.id)
+        )
+    ),
+
+    ...projects.filter(
+      (project) =>
+        !storedIds.has(
+          String(project.id)
+        ) &&
+        !deletedIds.has(
+          String(project.id)
+        )
+    ),
   ];
 }
 
@@ -85,106 +154,109 @@ export default function Projects() {
   const [search, setSearch] =
     useState("");
 
-  const [selectedCategory, setSelectedCategory] =
-    useState("All");
+  const [
+    selectedCategory,
+    setSelectedCategory,
+  ] = useState("All");
 
-  const [allProjects, setAllProjects] =
-    useState(() => getAllProjects());
+  const [
+    allProjects,
+    setAllProjects,
+  ] = useState(() =>
+    getAllProjects()
+  );
 
-  /*
-   * Refresh projects whenever localStorage
-   * changes from another browser tab/window.
-   */
   useEffect(() => {
-    const handleStorageChange = (event) => {
-      if (event.key === STORAGE_KEY) {
-        setAllProjects(getAllProjects());
-      }
+    const refreshProjects = () => {
+      setAllProjects(
+        getAllProjects()
+      );
     };
 
     window.addEventListener(
       "storage",
-      handleStorageChange
+      refreshProjects
+    );
+
+    document.addEventListener(
+      "visibilitychange",
+      refreshProjects
     );
 
     return () => {
       window.removeEventListener(
         "storage",
-        handleStorageChange
+        refreshProjects
       );
-    };
-  }, []);
 
-  /*
-   * Refresh when this page becomes visible again.
-   * This helps when returning from Add Project.
-   */
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (
-        document.visibilityState === "visible"
-      ) {
-        setAllProjects(getAllProjects());
-      }
-    };
-
-    document.addEventListener(
-      "visibilitychange",
-      handleVisibilityChange
-    );
-
-    return () => {
       document.removeEventListener(
         "visibilitychange",
-        handleVisibilityChange
+        refreshProjects
       );
     };
   }, []);
 
-  const filteredProjects = useMemo(() => {
-    const searchValue =
-      search.toLowerCase().trim();
-
-    return allProjects.filter((project) => {
-      const projectName = (
-        project.name || ""
-      ).toLowerCase();
-
-      const projectDescription = (
-        project.description || ""
-      ).toLowerCase();
-
-      const projectTechnologies =
-        Array.isArray(project.technologies)
-          ? project.technologies
-          : [];
-
-      const matchesSearch =
-        projectName.includes(searchValue) ||
-        projectDescription.includes(
-          searchValue
-        ) ||
-        projectTechnologies.some(
-          (technology) =>
-            technology
+  const filteredProjects =
+    useMemo(() => {
+      return allProjects.filter(
+        (project) => {
+          const searchValue =
+            search
               .toLowerCase()
-              .includes(searchValue)
-        );
+              .trim();
 
-      const matchesCategory =
-        selectedCategory === "All" ||
-        project.category === selectedCategory;
+          const projectName =
+            String(
+              project.name || ""
+            ).toLowerCase();
 
-      return (
-        matchesSearch &&
-        matchesCategory
+          const projectDescription =
+            String(
+              project.description || ""
+            ).toLowerCase();
+
+          const technologies =
+            Array.isArray(
+              project.technologies
+            )
+              ? project.technologies
+              : [];
+
+          const matchesSearch =
+            projectName.includes(
+              searchValue
+            ) ||
+            projectDescription.includes(
+              searchValue
+            ) ||
+            technologies.some(
+              (technology) =>
+                String(
+                  technology
+                )
+                  .toLowerCase()
+                  .includes(
+                    searchValue
+                  )
+            );
+
+          const matchesCategory =
+            selectedCategory ===
+              "All" ||
+            project.category ===
+              selectedCategory;
+
+          return (
+            matchesSearch &&
+            matchesCategory
+          );
+        }
       );
-    });
-  }, [
-    allProjects,
-    search,
-    selectedCategory,
-  ]);
+    }, [
+      allProjects,
+      search,
+      selectedCategory,
+    ]);
 
   return (
     <Box
@@ -196,7 +268,9 @@ export default function Projects() {
     >
       <Sidebar
         mobileOpen={mobileOpen}
-        onClose={() => setMobileOpen(false)}
+        onClose={() =>
+          setMobileOpen(false)
+        }
       />
 
       <Box
@@ -234,6 +308,7 @@ export default function Projects() {
           }}
         >
           {/* Header */}
+
           <motion.div
             initial={{
               opacity: 0,
@@ -272,7 +347,8 @@ export default function Projects() {
                       md: 30,
                     },
                     fontWeight: 800,
-                    letterSpacing: "-0.8px",
+                    letterSpacing:
+                      "-0.8px",
                   }}
                 >
                   My Projects
@@ -285,82 +361,33 @@ export default function Projects() {
                     color: "#777f8d",
                   }}
                 >
-                  A collection of projects,
-                  experiments and applications
-                  I've built.
+                  A collection of
+                  projects,
+                  experiments and
+                  applications I've
+                  built.
                 </Typography>
               </Box>
 
               {/* Header Actions */}
+
               <Box
                 sx={{
                   display: "flex",
-                  alignItems: "center",
+                  alignItems:
+                    "center",
                   gap: 1.2,
                   flexWrap: "wrap",
                 }}
               >
-                {/* Add Project */}
-                <motion.div
-                  whileHover={{
-                    scale: 1.03,
-                  }}
-                  whileTap={{
-                    scale: 0.97,
-                  }}
-                >
-                  <Button
-                    onClick={() =>
-                      navigate(
-                        "/projects/add"
-                      )
-                    }
-                    startIcon={
-                      <AddRoundedIcon
-                        sx={{
-                          fontSize: 19,
-                        }}
-                      />
-                    }
-                    sx={{
-                      minHeight: 42,
-                      px: 2,
-                      borderRadius: 2.5,
-                      textTransform: "none",
-                      color: "#ffffff",
-                      background:
-                        "linear-gradient(135deg, #7c5cff, #9b7cff)",
-                      border:
-                        "1px solid rgba(167,139,250,0.35)",
-                      boxShadow:
-                        "0 8px 25px rgba(124,92,255,0.18)",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      transition:
-                        "all 0.25s ease",
-                      "&:hover": {
-                        background:
-                          "linear-gradient(135deg, #8a6cff, #a78bfa)",
-                        boxShadow:
-                          "0 12px 32px rgba(124,92,255,0.3)",
-                        transform:
-                          "translateY(-1px)",
-                      },
-                    }}
-                  >
-                    Add Project
-                  </Button>
-                </motion.div>
-
-                {/* Project Count */}
                 <Box
                   sx={{
                     display: "flex",
-                    alignItems: "center",
+                    alignItems:
+                      "center",
                     gap: 1,
                     px: 1.5,
                     py: 1,
-                    minHeight: 42,
                     borderRadius: 2.5,
                     backgroundColor:
                       "rgba(155,124,255,0.08)",
@@ -379,17 +406,67 @@ export default function Projects() {
                     sx={{
                       fontSize: 12,
                       fontWeight: 600,
-                      color: "#b6adff",
+                      color:
+                        "#b6adff",
                     }}
                   >
-                    {allProjects.length} Projects
+                    {
+                      allProjects.length
+                    }{" "}
+                    Projects
                   </Typography>
                 </Box>
+
+                {/* ADD PROJECT */}
+
+                <Button
+                  startIcon={
+                    <AddRoundedIcon
+                      sx={{
+                        fontSize: 18,
+                      }}
+                    />
+                  }
+                  onClick={() =>
+                    navigate(
+                      "/projects/add"
+                    )
+                  }
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    borderRadius: 2.5,
+                    textTransform:
+                      "none",
+                    color: "#ffffff",
+                    background:
+                      "linear-gradient(135deg, #7657e8, #9b7cff)",
+                    border:
+                      "1px solid rgba(155,124,255,0.3)",
+                    fontSize: 12,
+                    fontWeight: 750,
+                    boxShadow:
+                      "0 8px 25px rgba(124,92,255,0.18)",
+                    transition:
+                      "all 0.25s ease",
+                    "&:hover": {
+                      transform:
+                        "translateY(-2px)",
+                      background:
+                        "linear-gradient(135deg, #8468ef, #a98cff)",
+                      boxShadow:
+                        "0 12px 30px rgba(124,92,255,0.28)",
+                    },
+                  }}
+                >
+                  Add Project
+                </Button>
               </Box>
             </Box>
           </motion.div>
 
-          {/* Search + Filters */}
+          {/* Search */}
+
           <Box
             sx={{
               mb: 4,
@@ -401,12 +478,12 @@ export default function Projects() {
                 "1px solid rgba(255,255,255,0.07)",
             }}
           >
-            {/* Search */}
             <Box
               sx={{
                 height: 46,
                 display: "flex",
-                alignItems: "center",
+                alignItems:
+                  "center",
                 px: 1.5,
                 borderRadius: 2.5,
                 backgroundColor:
@@ -443,26 +520,27 @@ export default function Projects() {
                 sx={{
                   color: "#ffffff",
                   fontSize: 13,
-                  "& input::placeholder": {
-                    color: "#626a78",
-                    opacity: 1,
-                  },
+                  "& input::placeholder":
+                    {
+                      color:
+                        "#626a78",
+                      opacity: 1,
+                    },
                 }}
               />
             </Box>
 
-            {/* Category Filters */}
+            {/* Categories */}
+
             <Box
               sx={{
                 mt: 1.5,
                 display: "flex",
-                alignItems: "center",
+                alignItems:
+                  "center",
                 gap: 1,
                 overflowX: "auto",
                 pb: 0.5,
-                "&::-webkit-scrollbar": {
-                  height: 3,
-                },
               }}
             >
               {categories.map(
@@ -481,16 +559,18 @@ export default function Projects() {
                       }
                       sx={{
                         flexShrink: 0,
-                        minWidth: "auto",
+                        minWidth:
+                          "auto",
                         px: 2,
                         py: 0.8,
                         borderRadius: 2,
                         textTransform:
                           "none",
                         fontSize: 11.5,
-                        fontWeight: active
-                          ? 700
-                          : 500,
+                        fontWeight:
+                          active
+                            ? 700
+                            : 500,
                         color: active
                           ? "#ffffff"
                           : "#7d8492",
@@ -519,22 +599,16 @@ export default function Projects() {
             </Box>
           </Box>
 
-          {/* Result Information */}
+          {/* Result */}
+
           <Box
             sx={{
               mb: 2.5,
               display: "flex",
-              alignItems: {
-                xs: "flex-start",
-                sm: "center",
-              },
+              alignItems:
+                "center",
               justifyContent:
                 "space-between",
-              flexDirection: {
-                xs: "column",
-                sm: "row",
-              },
-              gap: 1,
             }}
           >
             <Typography
@@ -551,7 +625,9 @@ export default function Projects() {
                   fontWeight: 700,
                 }}
               >
-                {filteredProjects.length}
+                {
+                  filteredProjects.length
+                }
               </Box>{" "}
               projects
             </Typography>
@@ -563,27 +639,26 @@ export default function Projects() {
                   color: "#9b7cff",
                 }}
               >
-                Searching for "{search}"
+                Searching for "
+                {search}"
               </Typography>
             )}
           </Box>
 
-          {/* Project Cards */}
-          {filteredProjects.length > 0 ? (
+          {/* Cards */}
+
+          {filteredProjects.length >
+          0 ? (
             <Grid
               container
               spacing={2.5}
             >
               {filteredProjects.map(
-                (project, index) => {
-                  const hasScreenshot =
-                    Array.isArray(
-                      project.screenshots
-                    ) &&
-                    project.screenshots.length >
-                      0;
-
-                  const technologies =
+                (
+                  project,
+                  index
+                ) => {
+                  const projectTechnologies =
                     Array.isArray(
                       project.technologies
                     )
@@ -617,13 +692,16 @@ export default function Projects() {
                           y: -6,
                         }}
                         style={{
-                          height: "100%",
+                          height:
+                            "100%",
                         }}
                       >
                         <Box
                           sx={{
-                            height: "100%",
-                            overflow: "hidden",
+                            height:
+                              "100%",
+                            overflow:
+                              "hidden",
                             borderRadius: 4,
                             background:
                               "linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025))",
@@ -639,7 +717,8 @@ export default function Projects() {
                             },
                           }}
                         >
-                          {/* Project Preview */}
+                          {/* Preview */}
+
                           <Box
                             sx={{
                               height: {
@@ -651,101 +730,64 @@ export default function Projects() {
                               overflow:
                                 "hidden",
                               background:
-                                project.gradient ||
-                                "linear-gradient(135deg, #5429a8 0%, #17112e 100%)",
+                                project.gradient,
                             }}
                           >
-                            {/* Actual Screenshot */}
-                            {hasScreenshot && (
-                              <Box
-                                component="img"
-                                src={
-                                  project
-                                    .screenshots[0]
-                                }
-                                alt={`${project.name} screenshot`}
+                            <Box
+                              sx={{
+                                position:
+                                  "absolute",
+                                inset: 0,
+                                opacity: 0.12,
+                                backgroundImage:
+                                  "linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px)",
+                                backgroundSize:
+                                  "35px 35px",
+                              }}
+                            />
+
+                            <Box
+                              sx={{
+                                position:
+                                  "absolute",
+                                inset: 0,
+                                display:
+                                  "flex",
+                                alignItems:
+                                  "center",
+                                justifyContent:
+                                  "center",
+                              }}
+                            >
+                              <Typography
                                 sx={{
-                                  position:
-                                    "absolute",
-                                  inset: 0,
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit:
-                                    "cover",
-                                  display:
-                                    "block",
-                                  transition:
-                                    "transform 0.5s ease",
-                                  "&:hover": {
-                                    transform:
-                                      "scale(1.04)",
-                                  },
+                                  px: 3,
+                                  textAlign:
+                                    "center",
+                                  fontSize: 24,
+                                  fontWeight: 800,
+                                  color:
+                                    "rgba(255,255,255,0.85)",
+                                  letterSpacing:
+                                    "-0.6px",
                                 }}
-                              />
-                            )}
+                              >
+                                {
+                                  project.name
+                                }
+                              </Typography>
+                            </Box>
 
-                            {/* Gradient Preview */}
-                            {!hasScreenshot && (
-                              <>
-                                <Box
-                                  sx={{
-                                    position:
-                                      "absolute",
-                                    inset: 0,
-                                    opacity: 0.12,
-                                    backgroundImage:
-                                      "linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px)",
-                                    backgroundSize:
-                                      "35px 35px",
-                                  }}
-                                />
-
-                                <Box
-                                  sx={{
-                                    position:
-                                      "absolute",
-                                    inset: 0,
-                                    display:
-                                      "flex",
-                                    alignItems:
-                                      "center",
-                                    justifyContent:
-                                      "center",
-                                  }}
-                                >
-                                  <Typography
-                                    sx={{
-                                      px: 3,
-                                      textAlign:
-                                        "center",
-                                      fontSize: 24,
-                                      fontWeight: 800,
-                                      color:
-                                        "rgba(255,255,255,0.85)",
-                                      letterSpacing:
-                                        "-0.6px",
-                                    }}
-                                  >
-                                    {
-                                      project.name
-                                    }
-                                  </Typography>
-                                </Box>
-                              </>
-                            )}
-
-                            {/* Preview Overlay */}
                             <Box
                               sx={{
                                 position:
                                   "absolute",
                                 inset: 0,
                                 background:
-                                  "linear-gradient(to bottom, rgba(7,9,13,0.05) 25%, rgba(7,9,13,0.85) 100%)",
+                                  "linear-gradient(to bottom, transparent 35%, rgba(7,9,13,0.78) 100%)",
                               }}
                             />
 
-                            {/* Category */}
                             <Box
                               sx={{
                                 position:
@@ -764,7 +806,7 @@ export default function Projects() {
                                   color:
                                     "#ffffff",
                                   backgroundColor:
-                                    "rgba(0,0,0,0.48)",
+                                    "rgba(0,0,0,0.35)",
                                   backdropFilter:
                                     "blur(8px)",
                                   border:
@@ -777,51 +819,6 @@ export default function Projects() {
                               />
                             </Box>
 
-                            {/* Screenshot Count */}
-                            {hasScreenshot && (
-                              <Box
-                                sx={{
-                                  position:
-                                    "absolute",
-                                  top: 15,
-                                  right: 15,
-                                  px: 1,
-                                  py: 0.6,
-                                  borderRadius:
-                                    1.5,
-                                  backgroundColor:
-                                    "rgba(0,0,0,0.48)",
-                                  backdropFilter:
-                                    "blur(8px)",
-                                  border:
-                                    "1px solid rgba(255,255,255,0.12)",
-                                }}
-                              >
-                                <Typography
-                                  sx={{
-                                    fontSize:
-                                      10,
-                                    color:
-                                      "#ffffff",
-                                    fontWeight:
-                                      700,
-                                  }}
-                                >
-                                  {project
-                                    .screenshots
-                                    .length}{" "}
-                                  screenshot
-                                  {project
-                                    .screenshots
-                                    .length >
-                                  1
-                                    ? "s"
-                                    : ""}
-                                </Typography>
-                              </Box>
-                            )}
-
-                            {/* Status + Year */}
                             <Box
                               sx={{
                                 position:
@@ -839,8 +836,7 @@ export default function Projects() {
                             >
                               <Typography
                                 sx={{
-                                  fontSize:
-                                    11,
+                                  fontSize: 11,
                                   color:
                                     "#ffffff",
                                   fontWeight:
@@ -854,8 +850,7 @@ export default function Projects() {
 
                               <Typography
                                 sx={{
-                                  fontSize:
-                                    11,
+                                  fontSize: 11,
                                   color:
                                     "rgba(255,255,255,0.7)",
                                 }}
@@ -867,7 +862,8 @@ export default function Projects() {
                             </Box>
                           </Box>
 
-                          {/* Card Content */}
+                          {/* Content */}
+
                           <Box
                             sx={{
                               p: 2.5,
@@ -891,8 +887,7 @@ export default function Projects() {
                             <Typography
                               sx={{
                                 mt: 1,
-                                fontSize:
-                                  12.5,
+                                fontSize: 12.5,
                                 lineHeight:
                                   1.7,
                                 color:
@@ -913,7 +908,6 @@ export default function Projects() {
                               }
                             </Typography>
 
-                            {/* Technologies */}
                             <Box
                               sx={{
                                 mt: 2,
@@ -924,7 +918,7 @@ export default function Projects() {
                                 gap: 0.8,
                               }}
                             >
-                              {technologies
+                              {projectTechnologies
                                 .slice(
                                   0,
                                   4
@@ -951,24 +945,12 @@ export default function Projects() {
                                           "1px solid rgba(255,255,255,0.06)",
                                         fontSize:
                                           10.5,
-                                        transition:
-                                          "all 0.2s ease",
-                                        "&:hover":
-                                          {
-                                            backgroundColor:
-                                              "rgba(155,124,255,0.1)",
-                                            color:
-                                              "#ffffff",
-                                            borderColor:
-                                              "rgba(155,124,255,0.2)",
-                                          },
                                       }}
                                     />
                                   )
                                 )}
                             </Box>
 
-                            {/* Progress */}
                             <Box
                               sx={{
                                 mt: 2.5,
@@ -985,8 +967,7 @@ export default function Projects() {
                               >
                                 <Typography
                                   sx={{
-                                    fontSize:
-                                      10.5,
+                                    fontSize: 10.5,
                                     color:
                                       "#656d7b",
                                   }}
@@ -996,8 +977,7 @@ export default function Projects() {
 
                                 <Typography
                                   sx={{
-                                    fontSize:
-                                      10.5,
+                                    fontSize: 10.5,
                                     color:
                                       "#9b7cff",
                                     fontWeight:
@@ -1014,8 +994,7 @@ export default function Projects() {
                               <Box
                                 sx={{
                                   height: 4,
-                                  borderRadius:
-                                    10,
+                                  borderRadius: 10,
                                   backgroundColor:
                                     "rgba(255,255,255,0.06)",
                                   overflow:
@@ -1048,7 +1027,8 @@ export default function Projects() {
                               </Box>
                             </Box>
 
-                            {/* View Project */}
+                            {/* View Only */}
+
                             <Button
                               fullWidth
                               endIcon={
@@ -1066,8 +1046,7 @@ export default function Projects() {
                               sx={{
                                 mt: 2.5,
                                 py: 1.1,
-                                borderRadius:
-                                  2.5,
+                                borderRadius: 2.5,
                                 textTransform:
                                   "none",
                                 color:
@@ -1076,8 +1055,7 @@ export default function Projects() {
                                   "rgba(124,92,255,0.1)",
                                 border:
                                   "1px solid rgba(124,92,255,0.16)",
-                                fontSize:
-                                  12,
+                                fontSize: 12,
                                 fontWeight:
                                   700,
                                 transition:
@@ -1112,7 +1090,6 @@ export default function Projects() {
               )}
             </Grid>
           ) : (
-            /* Empty State */
             <Box
               sx={{
                 py: 10,
@@ -1136,7 +1113,6 @@ export default function Projects() {
                 sx={{
                   fontSize: 17,
                   fontWeight: 700,
-                  color: "#ffffff",
                 }}
               >
                 No projects found
@@ -1146,11 +1122,13 @@ export default function Projects() {
                 sx={{
                   mt: 0.8,
                   fontSize: 12,
-                  color: "#686f7c",
+                  color:
+                    "#686f7c",
                 }}
               >
-                Try a different search term
-                or category.
+                Try a different
+                search term or
+                category.
               </Typography>
 
               <Button
@@ -1162,43 +1140,14 @@ export default function Projects() {
                 }}
                 sx={{
                   mt: 2,
-                  textTransform: "none",
+                  textTransform:
+                    "none",
                   color: "#a48cff",
                   fontSize: 12,
                   fontWeight: 700,
                 }}
               >
                 Clear filters
-              </Button>
-
-              <Button
-                onClick={() =>
-                  navigate(
-                    "/projects/add"
-                  )
-                }
-                startIcon={
-                  <AddRoundedIcon />
-                }
-                sx={{
-                  mt: 1,
-                  ml: 1,
-                  textTransform: "none",
-                  color: "#ffffff",
-                  backgroundColor:
-                    "rgba(124,92,255,0.12)",
-                  border:
-                    "1px solid rgba(124,92,255,0.2)",
-                  borderRadius: 2,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  "&:hover": {
-                    backgroundColor:
-                      "rgba(124,92,255,0.2)",
-                  },
-                }}
-              >
-                Add Project
               </Button>
             </Box>
           )}

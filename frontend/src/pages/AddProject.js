@@ -1,4 +1,7 @@
-import React from "react";
+import React, {
+  useEffect,
+  useState,
+} from "react";
 
 import {
   Alert,
@@ -24,10 +27,15 @@ import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 
 import { motion } from "motion/react";
 
-import { useNavigate } from "react-router-dom";
+import {
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+
+import projects from "../data/projects";
 
 const STORAGE_KEY = "akash_developer_projects";
 
@@ -73,6 +81,51 @@ const initialForm = {
   gradient: gradientOptions[0].value,
 };
 
+function getStoredProjects() {
+  try {
+    const storedProjects = localStorage.getItem(
+      STORAGE_KEY
+    );
+
+    if (!storedProjects) {
+      return [];
+    }
+
+    const parsedProjects = JSON.parse(
+      storedProjects
+    );
+
+    return Array.isArray(parsedProjects)
+      ? parsedProjects
+      : [];
+  } catch (error) {
+    console.error(
+      "Unable to read saved projects:",
+      error
+    );
+
+    return [];
+  }
+}
+
+function getAllProjects() {
+  const storedProjects = getStoredProjects();
+
+  const storedIds = new Set(
+    storedProjects.map((project) =>
+      String(project.id)
+    )
+  );
+
+  return [
+    ...storedProjects,
+    ...projects.filter(
+      (project) =>
+        !storedIds.has(String(project.id))
+    ),
+  ];
+}
+
 function resizeImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -90,12 +143,14 @@ function resizeImage(file) {
         if (width > maxWidth) {
           height =
             height * (maxWidth / width);
+
           width = maxWidth;
         }
 
         if (height > maxHeight) {
           width =
             width * (maxHeight / height);
+
           height = maxHeight;
         }
 
@@ -117,12 +172,16 @@ function resizeImage(file) {
         );
 
         const compressedImage =
-          canvas.toDataURL("image/jpeg", 0.82);
+          canvas.toDataURL(
+            "image/jpeg",
+            0.82
+          );
 
         resolve(compressedImage);
       };
 
       image.onerror = reject;
+
       image.src = event.target.result;
     };
 
@@ -135,23 +194,32 @@ function resizeImage(file) {
 export default function AddProject() {
   const navigate = useNavigate();
 
+  const [searchParams] =
+    useSearchParams();
+
+  const editId =
+    searchParams.get("edit");
+
+  const isEditMode =
+    Boolean(editId);
+
   const [mobileOpen, setMobileOpen] =
-    React.useState(false);
+    useState(false);
 
   const [form, setForm] =
-    React.useState(initialForm);
+    useState(initialForm);
 
   const [screenshots, setScreenshots] =
-    React.useState([]);
+    useState([]);
 
   const [errors, setErrors] =
-    React.useState({});
+    useState({});
 
   const [saving, setSaving] =
-    React.useState(false);
+    useState(false);
 
   const [snackbar, setSnackbar] =
-    React.useState({
+    useState({
       open: false,
       message: "",
       severity: "success",
@@ -160,9 +228,94 @@ export default function AddProject() {
   const fileInputRef =
     React.useRef(null);
 
+  useEffect(() => {
+    if (!isEditMode) {
+      return;
+    }
+
+    const project =
+      getAllProjects().find(
+        (item) =>
+          String(item.id) ===
+          String(editId)
+      );
+
+    if (!project) {
+      setSnackbar({
+        open: true,
+        message:
+          "Project could not be found.",
+        severity: "error",
+      });
+
+      navigate("/projects");
+
+      return;
+    }
+
+    setForm({
+      name: project.name || "",
+      category:
+        project.category ||
+        "Full-Stack",
+      status:
+        project.status ||
+        "Completed",
+      year: String(
+        project.year ||
+          new Date().getFullYear()
+      ),
+      description:
+        project.description || "",
+      technologies:
+        Array.isArray(
+          project.technologies
+        )
+          ? project.technologies.join(
+              ", "
+            )
+          : project.technologies ||
+            "",
+      features:
+        Array.isArray(
+          project.features
+        )
+          ? project.features.join(
+              "\n"
+            )
+          : project.features || "",
+      progress: Number.isFinite(
+        Number(project.progress)
+      )
+        ? Number(project.progress)
+        : 100,
+      liveUrl:
+        project.liveUrl || "",
+      githubUrl:
+        project.githubUrl || "",
+      gradient:
+        project.gradient ||
+        gradientOptions[0].value,
+    });
+
+    setScreenshots(
+      Array.isArray(
+        project.screenshots
+      )
+        ? project.screenshots
+        : []
+    );
+  }, [
+    editId,
+    isEditMode,
+    navigate,
+  ]);
+
   const handleChange = (event) => {
-    const { name, value } =
-      event.target;
+    const {
+      name,
+      value,
+    } = event.target;
 
     setForm((previous) => ({
       ...previous,
@@ -201,94 +354,111 @@ export default function AddProject() {
     setErrors(newErrors);
 
     return (
-      Object.keys(newErrors).length === 0
+      Object.keys(newErrors).length ===
+      0
     );
   };
 
-  const handleScreenshotUpload = async (
-    event
-  ) => {
-    const files = Array.from(
-      event.target.files || []
-    );
+  const handleScreenshotUpload =
+    async (event) => {
+      const files = Array.from(
+        event.target.files || []
+      );
 
-    if (!files.length) {
-      return;
-    }
+      if (!files.length) {
+        return;
+      }
 
-    const remainingSlots =
-      6 - screenshots.length;
+      const remainingSlots =
+        6 - screenshots.length;
 
-    if (remainingSlots <= 0) {
-      setSnackbar({
-        open: true,
-        message:
-          "You can upload a maximum of 6 screenshots.",
-        severity: "warning",
-      });
+      if (remainingSlots <= 0) {
+        setSnackbar({
+          open: true,
+          message:
+            "You can upload a maximum of 6 screenshots.",
+          severity: "warning",
+        });
 
-      return;
-    }
+        return;
+      }
 
-    const selectedFiles =
-      files.slice(0, remainingSlots);
-
-    const validFiles =
-      selectedFiles.filter((file) => {
-        if (
-          !file.type.startsWith("image/")
-        ) {
-          return false;
-        }
-
-        if (file.size > 8 * 1024 * 1024) {
-          return false;
-        }
-
-        return true;
-      });
-
-    if (!validFiles.length) {
-      setSnackbar({
-        open: true,
-        message:
-          "Please select valid image files under 8MB each.",
-        severity: "error",
-      });
-
-      return;
-    }
-
-    try {
-      const convertedImages =
-        await Promise.all(
-          validFiles.map(async (file) => {
-            return resizeImage(file);
-          })
+      const selectedFiles =
+        files.slice(
+          0,
+          remainingSlots
         );
 
-      setScreenshots((previous) => [
-        ...previous,
-        ...convertedImages,
-      ]);
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message:
-          "Something went wrong while processing the images.",
-        severity: "error",
-      });
-    }
+      const validFiles =
+        selectedFiles.filter(
+          (file) => {
+            if (
+              !file.type.startsWith(
+                "image/"
+              )
+            ) {
+              return false;
+            }
 
-    event.target.value = "";
-  };
+            if (
+              file.size >
+              8 * 1024 * 1024
+            ) {
+              return false;
+            }
 
-  const removeScreenshot = (index) => {
-    setScreenshots((previous) =>
-      previous.filter(
-        (_, screenshotIndex) =>
-          screenshotIndex !== index
-      )
+            return true;
+          }
+        );
+
+      if (!validFiles.length) {
+        setSnackbar({
+          open: true,
+          message:
+            "Please select valid image files under 8MB each.",
+          severity: "error",
+        });
+
+        return;
+      }
+
+      try {
+        const convertedImages =
+          await Promise.all(
+            validFiles.map(
+              async (file) => {
+                return resizeImage(file);
+              }
+            )
+          );
+
+        setScreenshots(
+          (previous) => [
+            ...previous,
+            ...convertedImages,
+          ]
+        );
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message:
+            "Something went wrong while processing the images.",
+          severity: "error",
+        });
+      }
+
+      event.target.value = "";
+    };
+
+  const removeScreenshot = (
+    index
+  ) => {
+    setScreenshots(
+      (previous) =>
+        previous.filter(
+          (_, screenshotIndex) =>
+            screenshotIndex !== index
+        )
     );
   };
 
@@ -308,14 +478,9 @@ export default function AddProject() {
 
     try {
       const existingProjects =
-        JSON.parse(
-          localStorage.getItem(
-            STORAGE_KEY
-          ) || "[]"
-        );
+        getStoredProjects();
 
-      const newProject = {
-        id: `${Date.now()}`,
+      const projectData = {
         name: form.name.trim(),
         category: form.category,
         status: form.status,
@@ -325,18 +490,100 @@ export default function AddProject() {
         technologies:
           form.technologies
             .split(",")
-            .map((item) => item.trim())
+            .map((item) =>
+              item.trim()
+            )
             .filter(Boolean),
         features:
           form.features
             .split("\n")
-            .map((item) => item.trim())
+            .map((item) =>
+              item.trim()
+            )
             .filter(Boolean),
-        progress: Number(form.progress),
-        liveUrl: form.liveUrl.trim(),
-        githubUrl: form.githubUrl.trim(),
+        progress: Number(
+          form.progress
+        ),
+        liveUrl:
+          form.liveUrl.trim(),
+        githubUrl:
+          form.githubUrl.trim(),
         screenshots,
         gradient: form.gradient,
+      };
+
+      if (isEditMode) {
+        const originalProject =
+          getAllProjects().find(
+            (item) =>
+              String(item.id) ===
+              String(editId)
+          );
+
+        if (!originalProject) {
+          throw new Error(
+            "Project not found"
+          );
+        }
+
+        const updatedProject = {
+          ...originalProject,
+          ...projectData,
+          id: originalProject.id,
+          createdAt:
+            originalProject.createdAt ||
+            new Date().toISOString(),
+          updatedAt:
+            new Date().toISOString(),
+        };
+
+        const alreadyStored =
+          existingProjects.some(
+            (project) =>
+              String(project.id) ===
+              String(editId)
+          );
+
+        const updatedProjects =
+          alreadyStored
+            ? existingProjects.map(
+                (project) =>
+                  String(project.id) ===
+                  String(editId)
+                    ? updatedProject
+                    : project
+              )
+            : [
+                updatedProject,
+                ...existingProjects,
+              ];
+
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify(
+            updatedProjects
+          )
+        );
+
+        setSnackbar({
+          open: true,
+          message:
+            "Project updated successfully!",
+          severity: "success",
+        });
+
+        setTimeout(() => {
+          navigate(
+            `/projects/${updatedProject.id}`
+          );
+        }, 900);
+
+        return;
+      }
+
+      const newProject = {
+        id: `${Date.now()}`,
+        ...projectData,
         createdAt:
           new Date().toISOString(),
       };
@@ -381,7 +628,9 @@ export default function AddProject() {
     >
       <Sidebar
         mobileOpen={mobileOpen}
-        onClose={() => setMobileOpen(false)}
+        onClose={() =>
+          setMobileOpen(false)
+        }
       />
 
       <Box
@@ -394,8 +643,16 @@ export default function AddProject() {
         }}
       >
         <Topbar
-          title="Add Project"
-          subtitle="Add a new project to your developer collection"
+          title={
+            isEditMode
+              ? "Edit Project"
+              : "Add Project"
+          }
+          subtitle={
+            isEditMode
+              ? "Update your project information"
+              : "Add a new project to your developer collection"
+          }
           onMenuClick={() =>
             setMobileOpen(true)
           }
@@ -415,6 +672,7 @@ export default function AddProject() {
           }}
         >
           {/* Header */}
+
           <motion.div
             initial={{
               opacity: 0,
@@ -433,12 +691,17 @@ export default function AddProject() {
                 <ArrowBackRoundedIcon />
               }
               onClick={() =>
-                navigate("/projects")
+                navigate(
+                  isEditMode
+                    ? `/projects/${editId}`
+                    : "/projects"
+                )
               }
               sx={{
                 mb: 3,
                 color: "#858c99",
-                textTransform: "none",
+                textTransform:
+                  "none",
                 borderRadius: 2,
                 "&:hover": {
                   color: "#ffffff",
@@ -447,16 +710,20 @@ export default function AddProject() {
                 },
               }}
             >
-              Back to Projects
+              {isEditMode
+                ? "Back to Project"
+                : "Back to Projects"}
             </Button>
           </motion.div>
 
           {/* Form */}
+
           <Grid
             container
             spacing={3}
           >
             {/* Left Section */}
+
             <Grid
               size={{
                 xs: 12,
@@ -506,9 +773,9 @@ export default function AddProject() {
                       color: "#6f7684",
                     }}
                   >
-                    Tell people what you built
-                    and what technologies you
-                    used.
+                    Tell people what you
+                    built and what
+                    technologies you used.
                   </Typography>
 
                   <Divider
@@ -524,6 +791,7 @@ export default function AddProject() {
                     spacing={2}
                   >
                     {/* Project Name */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -533,8 +801,12 @@ export default function AddProject() {
                         fullWidth
                         label="Project Name"
                         name="name"
-                        value={form.name}
-                        onChange={handleChange}
+                        value={
+                          form.name
+                        }
+                        onChange={
+                          handleChange
+                        }
                         error={Boolean(
                           errors.name
                         )}
@@ -545,11 +817,14 @@ export default function AddProject() {
                         InputLabelProps={{
                           shrink: true,
                         }}
-                        sx={fieldStyles}
+                        sx={
+                          fieldStyles
+                        }
                       />
                     </Grid>
 
                     {/* Category */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -561,12 +836,18 @@ export default function AddProject() {
                         fullWidth
                         label="Category"
                         name="category"
-                        value={form.category}
-                        onChange={handleChange}
+                        value={
+                          form.category
+                        }
+                        onChange={
+                          handleChange
+                        }
                         InputLabelProps={{
                           shrink: true,
                         }}
-                        sx={fieldStyles}
+                        sx={
+                          fieldStyles
+                        }
                       >
                         <MenuItem value="Full-Stack">
                           Full-Stack
@@ -595,6 +876,7 @@ export default function AddProject() {
                     </Grid>
 
                     {/* Status */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -606,12 +888,18 @@ export default function AddProject() {
                         fullWidth
                         label="Status"
                         name="status"
-                        value={form.status}
-                        onChange={handleChange}
+                        value={
+                          form.status
+                        }
+                        onChange={
+                          handleChange
+                        }
                         InputLabelProps={{
                           shrink: true,
                         }}
-                        sx={fieldStyles}
+                        sx={
+                          fieldStyles
+                        }
                       >
                         <MenuItem value="Completed">
                           Completed
@@ -632,6 +920,7 @@ export default function AddProject() {
                     </Grid>
 
                     {/* Year */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -643,16 +932,23 @@ export default function AddProject() {
                         type="number"
                         label="Year"
                         name="year"
-                        value={form.year}
-                        onChange={handleChange}
+                        value={
+                          form.year
+                        }
+                        onChange={
+                          handleChange
+                        }
                         InputLabelProps={{
                           shrink: true,
                         }}
-                        sx={fieldStyles}
+                        sx={
+                          fieldStyles
+                        }
                       />
                     </Grid>
 
                     {/* Progress */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -664,8 +960,12 @@ export default function AddProject() {
                         type="number"
                         label="Progress (%)"
                         name="progress"
-                        value={form.progress}
-                        onChange={handleChange}
+                        value={
+                          form.progress
+                        }
+                        onChange={
+                          handleChange
+                        }
                         inputProps={{
                           min: 0,
                           max: 100,
@@ -673,11 +973,14 @@ export default function AddProject() {
                         InputLabelProps={{
                           shrink: true,
                         }}
-                        sx={fieldStyles}
+                        sx={
+                          fieldStyles
+                        }
                       />
                     </Grid>
 
                     {/* Description */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -689,8 +992,12 @@ export default function AddProject() {
                         minRows={5}
                         label="Project Description"
                         name="description"
-                        value={form.description}
-                        onChange={handleChange}
+                        value={
+                          form.description
+                        }
+                        onChange={
+                          handleChange
+                        }
                         error={Boolean(
                           errors.description
                         )}
@@ -702,11 +1009,14 @@ export default function AddProject() {
                         InputLabelProps={{
                           shrink: true,
                         }}
-                        sx={fieldStyles}
+                        sx={
+                          fieldStyles
+                        }
                       />
                     </Grid>
 
                     {/* Technologies */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -721,7 +1031,9 @@ export default function AddProject() {
                         value={
                           form.technologies
                         }
-                        onChange={handleChange}
+                        onChange={
+                          handleChange
+                        }
                         error={Boolean(
                           errors.technologies
                         )}
@@ -733,11 +1045,14 @@ export default function AddProject() {
                         InputLabelProps={{
                           shrink: true,
                         }}
-                        sx={fieldStyles}
+                        sx={
+                          fieldStyles
+                        }
                       />
                     </Grid>
 
                     {/* Features */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -749,8 +1064,12 @@ export default function AddProject() {
                         minRows={5}
                         label="Key Features"
                         name="features"
-                        value={form.features}
-                        onChange={handleChange}
+                        value={
+                          form.features
+                        }
+                        onChange={
+                          handleChange
+                        }
                         error={Boolean(
                           errors.features
                         )}
@@ -764,11 +1083,14 @@ export default function AddProject() {
                         InputLabelProps={{
                           shrink: true,
                         }}
-                        sx={fieldStyles}
+                        sx={
+                          fieldStyles
+                        }
                       />
                     </Grid>
 
                     {/* Live URL */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -779,17 +1101,24 @@ export default function AddProject() {
                         fullWidth
                         label="Live Project URL"
                         name="liveUrl"
-                        value={form.liveUrl}
-                        onChange={handleChange}
+                        value={
+                          form.liveUrl
+                        }
+                        onChange={
+                          handleChange
+                        }
                         placeholder="https://your-project.com"
                         InputLabelProps={{
                           shrink: true,
                         }}
-                        sx={fieldStyles}
+                        sx={
+                          fieldStyles
+                        }
                       />
                     </Grid>
 
                     {/* Github */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -803,12 +1132,16 @@ export default function AddProject() {
                         value={
                           form.githubUrl
                         }
-                        onChange={handleChange}
+                        onChange={
+                          handleChange
+                        }
                         placeholder="https://github.com/..."
                         InputLabelProps={{
                           shrink: true,
                         }}
-                        sx={fieldStyles}
+                        sx={
+                          fieldStyles
+                        }
                       />
                     </Grid>
                   </Grid>
@@ -817,6 +1150,7 @@ export default function AddProject() {
             </Grid>
 
             {/* Right Section */}
+
             <Grid
               size={{
                 xs: 12,
@@ -824,6 +1158,7 @@ export default function AddProject() {
               }}
             >
               {/* Gradient */}
+
               <motion.div
                 initial={{
                   opacity: 0,
@@ -864,8 +1199,9 @@ export default function AddProject() {
                       color: "#6f7684",
                     }}
                   >
-                    Select the visual style
-                    for your project card.
+                    Select the visual
+                    style for your
+                    project card.
                   </Typography>
 
                   <Box
@@ -885,7 +1221,9 @@ export default function AddProject() {
 
                         return (
                           <Box
-                            key={option.label}
+                            key={
+                              option.label
+                            }
                             onClick={() =>
                               setForm(
                                 (
@@ -900,16 +1238,18 @@ export default function AddProject() {
                             sx={{
                               height: 80,
                               borderRadius: 2.5,
-                              cursor: "pointer",
+                              cursor:
+                                "pointer",
                               position:
                                 "relative",
                               overflow:
                                 "hidden",
                               background:
                                 option.value,
-                              border: selected
-                                ? "2px solid #9b7cff"
-                                : "1px solid rgba(255,255,255,0.08)",
+                              border:
+                                selected
+                                  ? "2px solid #9b7cff"
+                                  : "1px solid rgba(255,255,255,0.08)",
                               transition:
                                 "all 0.25s ease",
                               "&:hover": {
@@ -943,6 +1283,7 @@ export default function AddProject() {
               </motion.div>
 
               {/* Screenshot Upload */}
+
               <motion.div
                 initial={{
                   opacity: 0,
@@ -973,7 +1314,8 @@ export default function AddProject() {
                       display: "flex",
                       justifyContent:
                         "space-between",
-                      alignItems: "center",
+                      alignItems:
+                        "center",
                     }}
                   >
                     <Box>
@@ -993,8 +1335,8 @@ export default function AddProject() {
                           color: "#6f7684",
                         }}
                       >
-                        Show people the UI you
-                        built.
+                        Show people the
+                        UI you built.
                       </Typography>
                     </Box>
 
@@ -1025,7 +1367,8 @@ export default function AddProject() {
                       display: "flex",
                       flexDirection:
                         "column",
-                      alignItems: "center",
+                      alignItems:
+                        "center",
                       justifyContent:
                         "center",
                       cursor:
@@ -1091,12 +1434,15 @@ export default function AddProject() {
                   </Box>
 
                   {/* Preview */}
+
                   {screenshots.length >
                     0 && (
                     <Grid
                       container
                       spacing={1}
-                      sx={{ mt: 1 }}
+                      sx={{
+                        mt: 1,
+                      }}
                     >
                       {screenshots.map(
                         (
@@ -1184,6 +1530,7 @@ export default function AddProject() {
               </motion.div>
 
               {/* Save */}
+
               <motion.div
                 initial={{
                   opacity: 0,
@@ -1210,7 +1557,8 @@ export default function AddProject() {
                     mt: 3,
                     py: 1.5,
                     borderRadius: 3,
-                    textTransform: "none",
+                    textTransform:
+                      "none",
                     fontSize: 13,
                     fontWeight: 750,
                     background:
@@ -1230,12 +1578,17 @@ export default function AddProject() {
                   }}
                 >
                   {saving
-                    ? "Saving Project..."
-                    : "Save Project"}
+                    ? isEditMode
+                      ? "Saving Changes..."
+                      : "Saving Project..."
+                    : isEditMode
+                      ? "Save Changes"
+                      : "Save Project"}
                 </Button>
               </motion.div>
 
               {/* Information */}
+
               <Box
                 sx={{
                   mt: 2,
@@ -1270,11 +1623,13 @@ export default function AddProject() {
                       color: "#626977",
                     }}
                   >
-                    Screenshots are resized
-                    before being stored locally
-                    in your browser. We'll move
-                    this to proper backend storage
-                    when we build the FastAPI
+                    Screenshots are
+                    resized before being
+                    stored locally in
+                    your browser. We'll
+                    move this to proper
+                    backend storage when
+                    we build the FastAPI
                     backend.
                   </Typography>
                 </Box>
@@ -1288,10 +1643,12 @@ export default function AddProject() {
         open={snackbar.open}
         autoHideDuration={3500}
         onClose={() =>
-          setSnackbar((previous) => ({
-            ...previous,
-            open: false,
-          }))
+          setSnackbar(
+            (previous) => ({
+              ...previous,
+              open: false,
+            })
+          )
         }
         anchorOrigin={{
           vertical: "bottom",
@@ -1299,12 +1656,16 @@ export default function AddProject() {
         }}
       >
         <Alert
-          severity={snackbar.severity}
+          severity={
+            snackbar.severity
+          }
           onClose={() =>
-            setSnackbar((previous) => ({
-              ...previous,
-              open: false,
-            }))
+            setSnackbar(
+              (previous) => ({
+                ...previous,
+                open: false,
+              })
+            )
           }
           sx={{
             borderRadius: 2,
@@ -1331,19 +1692,22 @@ const fieldStyles = {
     fontSize: 13,
   },
 
-  "& .MuiInputLabel-root.Mui-focused": {
-    color: "#9b7cff",
-  },
+  "& .MuiInputLabel-root.Mui-focused":
+    {
+      color: "#9b7cff",
+    },
 
-  "& .MuiOutlinedInput-notchedOutline": {
-    borderColor:
-      "rgba(255,255,255,0.08)",
-  },
+  "& .MuiOutlinedInput-notchedOutline":
+    {
+      borderColor:
+        "rgba(255,255,255,0.08)",
+    },
 
-  "&:hover .MuiOutlinedInput-notchedOutline": {
-    borderColor:
-      "rgba(155,124,255,0.35)",
-  },
+  "&:hover .MuiOutlinedInput-notchedOutline":
+    {
+      borderColor:
+        "rgba(155,124,255,0.35)",
+    },
 
   "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
     {
