@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetails from "./pages/ProjectDetails";
 import AddProject from "./pages/AddProject";
+import Skills from "./pages/Skills";
 
 function PlaceholderPage({ title }) {
   return (
@@ -63,9 +64,7 @@ function App() {
         {/* Future Pages */}
         <Route
           path="/skills"
-          element={
-            <PlaceholderPage title="Skills" />
-          }
+          element={<Skills />}
         />
 
         <Route
