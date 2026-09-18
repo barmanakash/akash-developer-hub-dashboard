@@ -11,6 +11,7 @@ import Projects from "./pages/Projects";
 import ProjectDetails from "./pages/ProjectDetails";
 import AddProject from "./pages/AddProject";
 import Skills from "./pages/Skills";
+import Experience from "./pages/Experience";
 
 function PlaceholderPage({ title }) {
   return (
@@ -69,9 +70,7 @@ function App() {
 
         <Route
           path="/experience"
-          element={
-            <PlaceholderPage title="Experience" />
-          }
+          element={<Experience />}
         />
 
         <Route
