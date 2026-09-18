@@ -30,6 +30,8 @@ import { drawerWidth } from "../components/Sidebar";
 
 import projects from "../data/projects";
 
+import { getProjects } from "../services/api";
+
 const STORAGE_KEY =
   "akash_developer_projects";
 
@@ -166,35 +168,118 @@ export default function Projects() {
     getAllProjects()
   );
 
+  // useEffect(() => {
+  //   const refreshProjects = () => {
+  //     setAllProjects(
+  //       getAllProjects()
+  //     );
+  //   };
+
+  //   window.addEventListener(
+  //     "storage",
+  //     refreshProjects
+  //   );
+
+  //   document.addEventListener(
+  //     "visibilitychange",
+  //     refreshProjects
+  //   );
+
+  //   return () => {
+  //     window.removeEventListener(
+  //       "storage",
+  //       refreshProjects
+  //     );
+
+  //     document.removeEventListener(
+  //       "visibilitychange",
+  //       refreshProjects
+  //     );
+  //   };
+  // }, []);
+  
   useEffect(() => {
-    const refreshProjects = () => {
+  const loadProjects = async () => {
+    try {
+      const backendProjects =
+        await getProjects();
+
+      if (
+        Array.isArray(
+          backendProjects
+        )
+      ) {
+        const existingProjects =
+          getAllProjects();
+
+        const backendIds =
+          new Set(
+            backendProjects.map(
+              (project) =>
+                String(project.id)
+            )
+          );
+
+        const mergedProjects = [
+          ...backendProjects,
+          ...existingProjects.filter(
+            (project) =>
+              !backendIds.has(
+                String(project.id)
+              )
+          ),
+        ];
+
+        setAllProjects(
+          mergedProjects
+        );
+
+        return;
+      }
+
       setAllProjects(
         getAllProjects()
       );
-    };
+    } catch (error) {
+      console.error(
+        "Unable to load projects from backend:",
+        error
+      );
 
-    window.addEventListener(
+      setAllProjects(
+        getAllProjects()
+      );
+    }
+  };
+
+  const refreshProjects = () => {
+    loadProjects();
+  };
+
+  loadProjects();
+
+  window.addEventListener(
+    "storage",
+    refreshProjects
+  );
+
+  document.addEventListener(
+    "visibilitychange",
+    refreshProjects
+  );
+
+  return () => {
+    window.removeEventListener(
       "storage",
       refreshProjects
     );
 
-    document.addEventListener(
+    document.removeEventListener(
       "visibilitychange",
       refreshProjects
     );
-
-    return () => {
-      window.removeEventListener(
-        "storage",
-        refreshProjects
-      );
-
-      document.removeEventListener(
-        "visibilitychange",
-        refreshProjects
-      );
-    };
-  }, []);
+  };
+}, []);
 
   const filteredProjects =
     useMemo(() => {
