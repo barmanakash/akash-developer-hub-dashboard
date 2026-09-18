@@ -12,6 +12,7 @@ import ProjectDetails from "./pages/ProjectDetails";
 import AddProject from "./pages/AddProject";
 import Skills from "./pages/Skills";
 import Experience from "./pages/Experience";
+import Activity from "./pages/Activity";
 
 function PlaceholderPage({ title }) {
   return (
@@ -75,8 +76,7 @@ function App() {
 
         <Route
           path="/activity"
-          element={
-            <PlaceholderPage title="Activity" />
+          element={<Activity/>
           }
         />
 
