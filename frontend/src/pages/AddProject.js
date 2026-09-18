@@ -37,6 +37,10 @@ import Topbar from "../components/Topbar";
 
 import projects from "../data/projects";
 
+import {
+  logActivity,
+} from "../utils/activity";
+
 const STORAGE_KEY = "akash_developer_projects";
 
 const gradientOptions = [
@@ -263,7 +267,7 @@ export default function AddProject() {
         "Completed",
       year: String(
         project.year ||
-          new Date().getFullYear()
+        new Date().getFullYear()
       ),
       description:
         project.description || "",
@@ -272,17 +276,17 @@ export default function AddProject() {
           project.technologies
         )
           ? project.technologies.join(
-              ", "
-            )
+            ", "
+          )
           : project.technologies ||
-            "",
+          "",
       features:
         Array.isArray(
           project.features
         )
           ? project.features.join(
-              "\n"
-            )
+            "\n"
+          )
           : project.features || "",
       progress: Number.isFinite(
         Number(project.progress)
@@ -547,16 +551,16 @@ export default function AddProject() {
         const updatedProjects =
           alreadyStored
             ? existingProjects.map(
-                (project) =>
-                  String(project.id) ===
+              (project) =>
+                String(project.id) ===
                   String(editId)
-                    ? updatedProject
-                    : project
-              )
+                  ? updatedProject
+                  : project
+            )
             : [
-                updatedProject,
-                ...existingProjects,
-              ];
+              updatedProject,
+              ...existingProjects,
+            ];
 
         localStorage.setItem(
           STORAGE_KEY,
@@ -564,6 +568,17 @@ export default function AddProject() {
             updatedProjects
           )
         );
+
+        logActivity({
+          type: "updated",
+          title: "Project updated",
+          description:
+            `${updatedProject.name} was updated in your project collection.`,
+          projectId:
+            updatedProject.id,
+          projectName:
+            updatedProject.name,
+        });
 
         setSnackbar({
           open: true,
@@ -595,6 +610,17 @@ export default function AddProject() {
           ...existingProjects,
         ])
       );
+
+      logActivity({
+        type: "added",
+        title: "Project added",
+        description:
+          `${newProject.name} was added to your project collection.`,
+        projectId:
+          newProject.id,
+        projectName:
+          newProject.name,
+      });
 
       setSnackbar({
         open: true,
@@ -1373,7 +1399,7 @@ export default function AddProject() {
                         "center",
                       cursor:
                         screenshots.length >=
-                        6
+                          6
                           ? "not-allowed"
                           : "pointer",
                       transition:
@@ -1437,95 +1463,94 @@ export default function AddProject() {
 
                   {screenshots.length >
                     0 && (
-                    <Grid
-                      container
-                      spacing={1}
-                      sx={{
-                        mt: 1,
-                      }}
-                    >
-                      {screenshots.map(
-                        (
-                          screenshot,
-                          index
-                        ) => (
-                          <Grid
-                            key={index}
-                            size={{
-                              xs: 6,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                position:
-                                  "relative",
-                                borderRadius: 2,
-                                overflow:
-                                  "hidden",
-                                border:
-                                  "1px solid rgba(255,255,255,0.08)",
-                                aspectRatio:
-                                  "16 / 10",
-                                backgroundColor:
-                                  "#0d1016",
+                      <Grid
+                        container
+                        spacing={1}
+                        sx={{
+                          mt: 1,
+                        }}
+                      >
+                        {screenshots.map(
+                          (
+                            screenshot,
+                            index
+                          ) => (
+                            <Grid
+                              key={index}
+                              size={{
+                                xs: 6,
                               }}
                             >
                               <Box
-                                component="img"
-                                src={
-                                  screenshot
-                                }
-                                alt={`Screenshot ${
-                                  index + 1
-                                }`}
-                                sx={{
-                                  width:
-                                    "100%",
-                                  height:
-                                    "100%",
-                                  objectFit:
-                                    "cover",
-                                  display:
-                                    "block",
-                                }}
-                              />
-
-                              <IconButton
-                                size="small"
-                                onClick={() =>
-                                  removeScreenshot(
-                                    index
-                                  )
-                                }
                                 sx={{
                                   position:
-                                    "absolute",
-                                  top: 5,
-                                  right: 5,
-                                  width: 27,
-                                  height: 27,
-                                  color:
-                                    "#ffffff",
+                                    "relative",
+                                  borderRadius: 2,
+                                  overflow:
+                                    "hidden",
+                                  border:
+                                    "1px solid rgba(255,255,255,0.08)",
+                                  aspectRatio:
+                                    "16 / 10",
                                   backgroundColor:
-                                    "rgba(0,0,0,0.65)",
-                                  "&:hover": {
-                                    backgroundColor:
-                                      "rgba(220,60,80,0.85)",
-                                  },
+                                    "#0d1016",
                                 }}
                               >
-                                <CloseRoundedIcon
+                                <Box
+                                  component="img"
+                                  src={
+                                    screenshot
+                                  }
+                                  alt={`Screenshot ${index + 1
+                                    }`}
                                   sx={{
-                                    fontSize: 16,
+                                    width:
+                                      "100%",
+                                    height:
+                                      "100%",
+                                    objectFit:
+                                      "cover",
+                                    display:
+                                      "block",
                                   }}
                                 />
-                              </IconButton>
-                            </Box>
-                          </Grid>
-                        )
-                      )}
-                    </Grid>
-                  )}
+
+                                <IconButton
+                                  size="small"
+                                  onClick={() =>
+                                    removeScreenshot(
+                                      index
+                                    )
+                                  }
+                                  sx={{
+                                    position:
+                                      "absolute",
+                                    top: 5,
+                                    right: 5,
+                                    width: 27,
+                                    height: 27,
+                                    color:
+                                      "#ffffff",
+                                    backgroundColor:
+                                      "rgba(0,0,0,0.65)",
+                                    "&:hover": {
+                                      backgroundColor:
+                                        "rgba(220,60,80,0.85)",
+                                    },
+                                  }}
+                                >
+                                  <CloseRoundedIcon
+                                    sx={{
+                                      fontSize: 16,
+                                    }}
+                                  />
+                                </IconButton>
+                              </Box>
+                            </Grid>
+                          )
+                        )}
+                      </Grid>
+                    )}
                 </Box>
               </motion.div>
 
@@ -1693,27 +1718,27 @@ const fieldStyles = {
   },
 
   "& .MuiInputLabel-root.Mui-focused":
-    {
-      color: "#9b7cff",
-    },
+  {
+    color: "#9b7cff",
+  },
 
   "& .MuiOutlinedInput-notchedOutline":
-    {
-      borderColor:
-        "rgba(255,255,255,0.08)",
-    },
+  {
+    borderColor:
+      "rgba(255,255,255,0.08)",
+  },
 
   "&:hover .MuiOutlinedInput-notchedOutline":
-    {
-      borderColor:
-        "rgba(155,124,255,0.35)",
-    },
+  {
+    borderColor:
+      "rgba(155,124,255,0.35)",
+  },
 
   "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
-    {
-      borderColor: "#8c70ee",
-      borderWidth: 1,
-    },
+  {
+    borderColor: "#8c70ee",
+    borderWidth: 1,
+  },
 
   "& .MuiFormHelperText-root": {
     marginLeft: 0,
