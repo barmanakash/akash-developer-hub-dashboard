@@ -11,6 +11,7 @@ import {
   DialogTitle,
   Divider,
   Grid,
+  IconButton,
   Typography,
 } from "@mui/material";
 
@@ -24,6 +25,9 @@ import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 
 import { motion } from "motion/react";
 
@@ -154,6 +158,10 @@ export default function ProjectDetails() {
     deleteDialogOpen,
     setDeleteDialogOpen,
   ] = useState(false);
+
+  // Index of the screenshot open in the full-size viewer (null = closed)
+  const [previewIndex, setPreviewIndex] =
+    useState(null);
 
   const project =
     getAllProjects().find(
@@ -317,6 +325,28 @@ export default function ProjectDetails() {
     )
       ? project.screenshots
       : [];
+
+  const closePreview = () =>
+    setPreviewIndex(null);
+
+  const showNextScreenshot = () =>
+    setPreviewIndex((current) =>
+      current === null ||
+      screenshots.length === 0
+        ? current
+        : (current + 1) %
+          screenshots.length
+    );
+
+  const showPreviousScreenshot = () =>
+    setPreviewIndex((current) =>
+      current === null ||
+      screenshots.length === 0
+        ? current
+        : (current - 1 +
+            screenshots.length) %
+          screenshots.length
+    );
 
   const technologies =
     Array.isArray(
@@ -983,11 +1013,18 @@ export default function ProjectDetails() {
                             alt={`${project.name} screenshot ${
                               index + 1
                             }`}
+                            onClick={() =>
+                              setPreviewIndex(
+                                index
+                              )
+                            }
                             sx={{
                               width:
                                 "100%",
                               display:
                                 "block",
+                              cursor:
+                                "zoom-in",
                               borderRadius: 3,
                               border:
                                 "1px solid rgba(255,255,255,0.08)",
@@ -1350,6 +1387,163 @@ export default function ProjectDetails() {
           </Grid>
         </Container>
       </Box>
+
+      {/* SCREENSHOT VIEWER */}
+
+      <Dialog
+        open={previewIndex !== null}
+        onClose={closePreview}
+        maxWidth={false}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowRight") {
+            showNextScreenshot();
+          }
+
+          if (event.key === "ArrowLeft") {
+            showPreviousScreenshot();
+          }
+        }}
+        sx={{
+          "& .MuiBackdrop-root": {
+            backgroundColor:
+              "rgba(0,0,0,0.88)",
+          },
+        }}
+        PaperProps={{
+          sx: {
+            m: 2,
+            maxWidth: "95vw",
+            overflow: "visible",
+            backgroundColor:
+              "transparent",
+            backgroundImage: "none",
+            boxShadow: "none",
+          },
+        }}
+      >
+        {previewIndex !== null &&
+          screenshots[previewIndex] && (
+            <Box
+              sx={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Box
+                component="img"
+                src={
+                  screenshots[previewIndex]
+                }
+                alt={`${project.name} screenshot ${
+                  previewIndex + 1
+                }`}
+                sx={{
+                  display: "block",
+                  maxWidth: "92vw",
+                  maxHeight: "85vh",
+                  objectFit: "contain",
+                  borderRadius: 2,
+                  border:
+                    "1px solid rgba(255,255,255,0.1)",
+                }}
+              />
+
+              {/* Close */}
+
+              <IconButton
+                onClick={closePreview}
+                aria-label="Close image"
+                sx={{
+                  position: "absolute",
+                  top: 10,
+                  right: 10,
+                  color: "#ffffff",
+                  backgroundColor:
+                    "rgba(0,0,0,0.6)",
+                  "&:hover": {
+                    backgroundColor:
+                      "rgba(0,0,0,0.85)",
+                  },
+                }}
+              >
+                <CloseRoundedIcon />
+              </IconButton>
+
+              {screenshots.length > 1 && (
+                <>
+                  {/* Previous */}
+
+                  <IconButton
+                    onClick={
+                      showPreviousScreenshot
+                    }
+                    aria-label="Previous image"
+                    sx={{
+                      position: "absolute",
+                      left: 10,
+                      color: "#ffffff",
+                      backgroundColor:
+                        "rgba(0,0,0,0.6)",
+                      "&:hover": {
+                        backgroundColor:
+                          "rgba(0,0,0,0.85)",
+                      },
+                    }}
+                  >
+                    <ChevronLeftRoundedIcon />
+                  </IconButton>
+
+                  {/* Next */}
+
+                  <IconButton
+                    onClick={
+                      showNextScreenshot
+                    }
+                    aria-label="Next image"
+                    sx={{
+                      position: "absolute",
+                      right: 10,
+                      color: "#ffffff",
+                      backgroundColor:
+                        "rgba(0,0,0,0.6)",
+                      "&:hover": {
+                        backgroundColor:
+                          "rgba(0,0,0,0.85)",
+                      },
+                    }}
+                  >
+                    <ChevronRightRoundedIcon />
+                  </IconButton>
+
+                  {/* Counter */}
+
+                  <Typography
+                    sx={{
+                      position: "absolute",
+                      bottom: 12,
+                      left: "50%",
+                      transform:
+                        "translateX(-50%)",
+                      px: 1.5,
+                      py: 0.4,
+                      borderRadius: 10,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#ffffff",
+                      backgroundColor:
+                        "rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    {previewIndex + 1} /{" "}
+                    {screenshots.length}
+                  </Typography>
+                </>
+              )}
+            </Box>
+          )}
+      </Dialog>
 
       {/* DELETE CONFIRMATION */}
 

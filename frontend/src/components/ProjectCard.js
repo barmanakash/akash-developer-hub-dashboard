@@ -10,6 +10,7 @@ import {
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 
 import { motion } from "motion/react";
+import { useNavigate } from "react-router-dom";
 
 const defaultProject = {
   name: "Project",
@@ -29,6 +30,23 @@ export default function ProjectCard({
   const safeProject = {
     ...defaultProject,
     ...project,
+  };
+
+  const navigate = useNavigate();
+
+  const handleViewProject = () => {
+    if (
+      safeProject.id === undefined ||
+      safeProject.id === null
+    ) {
+      return;
+    }
+
+    navigate(
+      `/projects/${encodeURIComponent(
+        safeProject.id
+      )}`
+    );
   };
 
   return (
@@ -202,6 +220,7 @@ export default function ProjectCard({
 
           {/* View Project */}
           <Button
+            onClick={handleViewProject}
             endIcon={
               <ArrowForwardRoundedIcon
                 sx={{

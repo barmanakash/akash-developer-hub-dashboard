@@ -32,47 +32,12 @@ import { drawerWidth } from "../components/Sidebar";
 import { motion } from "motion/react";
 import { useNavigate } from "react-router-dom";
 
-const PROJECTS_KEY = "akash_developer_projects";
-const ACTIVITY_KEY = "akash_developer_activity";
+import projects from "../data/projects";
+import { getProjects } from "../services/api";
 
-const projects = [
-  {
-    id: 1,
-    name: "AI Customer Support",
-    category: "AI / Automation",
-    status: "In Progress",
-    progress: 72,
-    description:
-      "AI-powered customer support platform designed to automate common support workflows.",
-    technologies: ["React", "FastAPI", "AI"],
-    gradient:
-      "linear-gradient(135deg, #31246b 0%, #5b3da8 50%, #1d163d 100%)",
-  },
-  {
-    id: 2,
-    name: "Coaching Management",
-    category: "Full-Stack",
-    status: "In Progress",
-    progress: 58,
-    description:
-      "A complete platform for coaching institutes with teachers, students, resources and communication.",
-    technologies: ["React", "FastAPI", "MongoDB"],
-    gradient:
-      "linear-gradient(135deg, #124b54 0%, #197278 50%, #0b292e 100%)",
-  },
-  {
-    id: 3,
-    name: "JPG to PNG Converter",
-    category: "Frontend",
-    status: "Completed",
-    progress: 100,
-    description:
-      "A responsive image conversion tool with a clean interface and animated interactions.",
-    technologies: ["React", "MUI", "Motion"],
-    gradient:
-      "linear-gradient(135deg, #663c1f 0%, #a86b36 50%, #332011 100%)",
-  },
-];
+const PROJECTS_KEY = "akash_developer_projects";
+const DELETED_KEY = "akash_deleted_projects";
+const ACTIVITY_KEY = "akash_developer_activity";
 
 function getStoredProjects() {
   try {
@@ -100,8 +65,40 @@ function getStoredProjects() {
   }
 }
 
+function getDeletedProjectIds() {
+  try {
+    const deletedProjects =
+      localStorage.getItem(DELETED_KEY);
+
+    if (!deletedProjects) {
+      return [];
+    }
+
+    const parsedProjects = JSON.parse(
+      deletedProjects
+    );
+
+    return Array.isArray(parsedProjects)
+      ? parsedProjects.map((id) => String(id))
+      : [];
+  } catch (error) {
+    console.error(
+      "Unable to read deleted projects:",
+      error
+    );
+
+    return [];
+  }
+}
+
+// Same rules as the Projects page:
+// saved projects + built-in projects, minus deleted ones.
 function getAllProjects() {
   const storedProjects = getStoredProjects();
+
+  const deletedIds = new Set(
+    getDeletedProjectIds()
+  );
 
   const storedIds = new Set(
     storedProjects.map((project) =>
@@ -110,12 +107,75 @@ function getAllProjects() {
   );
 
   return [
-    ...storedProjects,
+    ...storedProjects.filter(
+      (project) =>
+        !deletedIds.has(String(project.id))
+    ),
     ...projects.filter(
       (project) =>
-        !storedIds.has(String(project.id))
+        !storedIds.has(String(project.id)) &&
+        !deletedIds.has(String(project.id))
     ),
   ];
+}
+
+// Adds backend projects on top, exactly like the Projects page does.
+async function loadAllProjects() {
+  const localProjects = getAllProjects();
+
+  try {
+    const backendProjects =
+      await getProjects();
+
+    if (!Array.isArray(backendProjects)) {
+      return localProjects;
+    }
+
+    const backendIds = new Set(
+      backendProjects.map((project) =>
+        String(project.id)
+      )
+    );
+
+    return [
+      ...backendProjects,
+      ...localProjects.filter(
+        (project) =>
+          !backendIds.has(String(project.id))
+      ),
+    ];
+  } catch (error) {
+    console.error(
+      "Unable to load projects from backend:",
+      error
+    );
+
+    return localProjects;
+  }
+}
+
+// Statuses used in the app: "In Progress" and "In Development".
+function isActiveProject(project) {
+  const status = String(
+    project.status || ""
+  ).toLowerCase();
+
+  return (
+    status.includes("progress") ||
+    status.includes("development")
+  );
+}
+
+// "Reactjs", "React.js" and "React" are one technology,
+// and so are "Fast API" / "FastAPI" and "mui" / "MUI".
+function normalizeTechnology(technology) {
+  const key = String(technology)
+    .toLowerCase()
+    .replace(/[\s._-]+/g, "");
+
+  return key.length > 4 && key.endsWith("js")
+    ? key.slice(0, -2)
+    : key;
 }
 
 function getStoredActivities() {
@@ -266,17 +326,19 @@ export default function Dashboard() {
     setMobileOpen(false);
   };
 
-  const refreshDashboard = () => {
-    setDashboardProjects(
-      getAllProjects()
-    );
-
+  const refreshDashboard = async () => {
     setActivities(
       getStoredActivities()
+    );
+
+    setDashboardProjects(
+      await loadAllProjects()
     );
   };
 
   useEffect(() => {
+    refreshDashboard();
+
     window.addEventListener(
       "storage",
       refreshDashboard
@@ -316,16 +378,14 @@ export default function Dashboard() {
 
     const activeProjects =
       dashboardProjects.filter(
-        (project) =>
-          String(project.status)
-            .toLowerCase()
-            .includes("progress")
+        isActiveProject
       ).length;
 
     const liveProjects =
       dashboardProjects.filter(
         (project) =>
-          Boolean(project.liveUrl)
+          String(project.liveUrl || "")
+            .trim() !== ""
       ).length;
 
     const technologySet = new Set();
@@ -339,11 +399,13 @@ export default function Dashboard() {
         ) {
           project.technologies.forEach(
             (technology) => {
-              if (technology) {
-                technologySet.add(
-                  String(technology)
-                    .trim()
+              const key =
+                normalizeTechnology(
+                  technology || ""
                 );
+
+              if (key) {
+                technologySet.add(key);
               }
             }
           );
@@ -547,7 +609,7 @@ export default function Dashboard() {
                 title="Total Projects"
                 value={String(
                   statistics.totalProjects
-                )}
+                ).padStart(2, "0")}
                 subtitle="Projects in your collection"
                 icon={
                   <FolderRoundedIcon />
